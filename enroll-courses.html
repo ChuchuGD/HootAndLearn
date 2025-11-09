@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscribirse a Cursos - Hoot & Learn</title>
+    <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f7fafc;
+            color: #2d3748;
+            min-height: 100%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        /* === FONDO ANIMADO === */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 25%, #a0aec0 50%, #718096 75%, #4a5568 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            z-index: -1;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* === HEADER === */
+        .header {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(20px);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .back-btn {
+            position: fixed;
+            bottom: 2rem;
+            left: 2rem;
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(10px);
+            color: #2d3748;
+            border: 1px solid rgba(255,255,255,0.9);
+            padding: 1rem;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            height: 50px;
+            z-index: 1000;
+            font-size: 1.2rem;
+        }
+
+        .back-btn:hover {
+            background: rgba(255,255,255,0.95);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(45,55,72,0.2);
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 3rem;
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 50%, #5a67d8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* === FILTROS === */
+        .filters-section {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 8px 32px rgba(45,55,72,0.1);
+        }
+
+        .filters-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #2d3748;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 1.5rem;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+
+        .filter-input, .filter-select {
+            padding: 0.8rem 1rem;
+            border: 1px solid rgba(45,55,72,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.9);
+            font-size: 1rem;
+            color: #2d3748;
+            transition: all 0.3s ease;
+        }
+
+        .filter-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: #5a67d8;
+            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.1);
+        }
+
+        /* === CURSOS === */
+        .courses-section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: #2d3748;
+        }
+
+        .courses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .course-card {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            transition: all 0.4s ease;
+            box-shadow: 0 8px 32px rgba(45,55,72,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .course-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #5a67d8, #667eea);
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+        }
+
+        .course-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .course-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(45,55,72,0.2);
+            background: rgba(255,255,255,0.95);
+        }
+
+        .course-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .course-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #2d3748;
+        }
+
+        .course-category {
+            background: rgba(90, 103, 216, 0.1);
+            color: #5a67d8;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        .course-description {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .course-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .course-price {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #5a67d8;
+        }
+
+        .course-duration {
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .enroll-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(90, 103, 216, 0.2);
+        }
+
+        .enroll-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(90, 103, 216, 0.3);
+        }
+
+        /* === NO RESULTS === */
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #4a5568;
+            font-size: 1.1rem;
+        }
+
+        /* === MODAL DE INSCRIPCIÓN === */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 25px;
+            padding: 3rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 20px 60px rgba(45,55,72,0.3);
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #4a5568;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: #2d3748;
+            transform: scale(1.1);
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .step {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            color: #4a5568;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin: 0 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            background: #5a67d8;
+            color: white;
+        }
+
+        .step.completed {
+            background: #48bb78;
+            color: white;
+        }
+
+        .step-content {
+            display: none;
+        }
+
+        .step-content.active {
+            display: block;
+        }
+
+        .step-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: #2d3748;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid rgba(45,55,72,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.9);
+            font-size: 1rem;
+            color: #2d3748;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #5a67d8;
+            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.1);
+        }
+
+        .course-summary {
+            background: rgba(90, 103, 216, 0.1);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-title {
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #5a67d8;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn-secondary {
+            flex: 1;
+            background: rgba(74, 85, 104, 0.1);
+            color: #4a5568;
+            border: 1px solid rgba(74, 85, 104, 0.2);
+            padding: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(74, 85, 104, 0.2);
+        }
+
+        .btn-primary {
+            flex: 1;
+            background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(90, 103, 216, 0.3);
+        }
+
+        .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #5a67d8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 2rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-icon {
+            font-size: 4rem;
+            color: #48bb78;
+            margin-bottom: 1rem;
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .page-title {
+                font-size: 2rem;
+            }
+
+            .modal-content {
+                padding: 2rem;
+                margin: 1rem;
+            }
+
+            .modal-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- === FONDO ANIMADO === -->
+    <div class="animated-bg"></div>
+
+    <!-- === HEADER === -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">Hoot & Learn</div>
+            <div class="welcome-text">Hola, <span id="studentName">Estudiante</span>!</div>
+        </div>
+    </header>
+
+    <!-- === MAIN CONTENT === -->
+    <main class="main-content">
+        <h1 class="page-title">Inscribirse a Cursos</h1>
+
+        <!-- === FILTROS === -->
+        <section class="filters-section">
+            <h2 class="filters-title">🔍 Buscar y Filtrar Cursos</h2>
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label class="filter-label">Buscar por nombre:</label>
+                    <input type="text" class="filter-input" id="searchInput" placeholder="Escribe el nombre del curso..." onkeyup="filterCourses()">
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Categoría:</label>
+                    <select class="filter-select" id="categoryFilter" onchange="filterCourses()">
+                        <option value="">Todas las categorías</option>
+                        <option value="Programación">Programación</option>
+                        <option value="Diseño">Diseño</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Idiomas">Idiomas</option>
+                        <option value="Negocios">Negocios</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Precio máximo:</label>
+                    <select class="filter-select" id="priceFilter" onchange="filterCourses()">
+                        <option value="">Cualquier precio</option>
+                        <option value="50">Hasta $50</option>
+                        <option value="100">Hasta $100</option>
+                        <option value="200">Hasta $200</option>
+                        <option value="500">Hasta $500</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- === CURSOS RECOMENDADOS === -->
+        <section class="courses-section">
+            <h2 class="section-title">📚 Cursos Recomendados</h2>
+            <div class="courses-grid" id="coursesGrid">
+                <!-- Los cursos se cargarán dinámicamente -->
+            </div>
+            <div class="no-results" id="noResults" style="display: none;">
+                😔 No se encontraron cursos que coincidan con tu búsqueda.
+            </div>
+        </section>
+    </main>
+
+    <!-- === BOTÓN REGRESAR FLOTANTE === -->
+    <a href="student-dashboard.html" class="back-btn">←</a>
+
+    <!-- === MODAL DE INSCRIPCIÓN === -->
+    <div class="modal" id="enrollModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            
+            <!-- Indicador de pasos -->
+            <div class="step-indicator">
+                <div class="step active" id="step1">1</div>
+                <div class="step" id="step2">2</div>
+                <div class="step" id="step3">3</div>
+                <div class="step" id="step4">4</div>
+            </div>
+
+            <!-- PASO 1: Confirmación -->
+            <div class="step-content active" id="stepContent1">
+                <h3 class="step-title">📋 Confirmar Selección</h3>
+                <div class="course-summary" id="courseSummary">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+                <p style="text-align: center; color: #4a5568; margin-bottom: 2rem;">
+                    ¿Estás seguro de que quieres inscribirte a este curso?
+                </p>
+                <div class="modal-buttons">
+                    <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button class="btn-primary" onclick="nextStep()">Continuar</button>
+                </div>
+            </div>
+
+            <!-- PASO 2: Información de pago -->
+            <div class="step-content" id="stepContent2">
+                <h3 class="step-title">💳 Información de Pago</h3>
+                <form id="paymentForm">
+                    <div class="form-group">
+                        <label class="form-label">Nombre Completo:</label>
+                        <input type="text" class="form-input" id="fullName" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email:</label>
+                        <input type="email" class="form-input" id="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ID de Estudiante:</label>
+                        <input type="text" class="form-input" id="studentId" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Número de Tarjeta:</label>
+                        <input type="text" class="form-input" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19" required>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">Fecha de Vencimiento:</label>
+                            <input type="text" class="form-input" id="expiryDate" placeholder="MM/AA" maxlength="5" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">CVV:</label>
+                            <input type="text" class="form-input" id="cvv" placeholder="123" maxlength="3" required>
+                        </div>
+                    </div>
+                </form>
+                <div class="modal-buttons">
+                    <button class="btn-secondary" onclick="prevStep()">Atrás</button>
+                    <button class="btn-primary" onclick="processPayment()">Procesar Pago</button>
+                </div>
+            </div>
+
+            <!-- PASO 3: Procesando pago -->
+            <div class="step-content" id="stepContent3">
+                <h3 class="step-title">⏳ Procesando Pago</h3>
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p style="color: #4a5568; font-size: 1.1rem;">
+                        Estamos procesando tu pago de forma segura...<br>
+                        Por favor no cierres esta ventana.
+                    </p>
+                </div>
+            </div>
+
+            <!-- PASO 4: Pago completado -->
+            <div class="step-content" id="stepContent4">
+                <h3 class="step-title">🎉 ¡Pago Completado!</h3>
+                <div style="text-align: center;">
+                    <div class="success-icon">✅</div>
+                    <p style="color: #2d3748; font-size: 1.2rem; margin-bottom: 1rem;">
+                        <strong>¡Felicidades!</strong> Te has inscrito exitosamente.
+                    </p>
+                    <p style="color: #4a5568; margin-bottom: 2rem;">
+                        Ya puedes ver tu curso en la sección "Ver Mis Cursos" de tu dashboard.
+                    </p>
+                    <div class="modal-buttons">
+                        <button class="btn-secondary" onclick="closeModal()">Cerrar</button>
+                        <button class="btn-primary" onclick="goToMyCourses()">Ver Mis Cursos</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === DATOS DE CURSOS ===
+        const courses = [
+            {
+                id: 1,
+                title: "JavaScript Desde Cero",
+                category: "Programación",
+                price: 89,
+                duration: "8 semanas",
+                icon: "💻",
+                description: "Aprende JavaScript desde los fundamentos hasta conceptos avanzados. Perfecto para principiantes."
+            },
+            {
+                id: 2,
+                title: "Diseño UI/UX Profesional",
+                category: "Diseño",
+                price: 120,
+                duration: "6 semanas",
+                icon: "🎨",
+                description: "Domina las herramientas y principios del diseño de interfaces y experiencia de usuario."
+            },
+            {
+                id: 3,
+                title: "Marketing Digital Avanzado",
+                category: "Marketing",
+                price: 150,
+                duration: "10 semanas",
+                icon: "📈",
+                description: "Estrategias completas de marketing digital, SEO, SEM y redes sociales."
+            },
+            {
+                id: 4,
+                title: "Inglés Conversacional",
+                category: "Idiomas",
+                price: 75,
+                duration: "12 semanas",
+                icon: "🗣️",
+                description: "Mejora tu inglés conversacional con clases interactivas y práctica constante."
+            },
+            {
+                id: 5,
+                title: "Python para Data Science",
+                category: "Programación",
+                price: 200,
+                duration: "14 semanas",
+                icon: "🐍",
+                description: "Análisis de datos, machine learning y visualización con Python y sus librerías."
+            },
+            {
+                id: 6,
+                title: "Emprendimiento Digital",
+                category: "Negocios",
+                price: 180,
+                duration: "8 semanas",
+                icon: "🚀",
+                description: "Crea y lanza tu startup digital con metodologías probadas y casos reales."
+            },
+            {
+                id: 7,
+                title: "Fotografía Digital",
+                category: "Diseño",
+                price: 95,
+                duration: "6 semanas",
+                icon: "📸",
+                description: "Técnicas profesionales de fotografía digital, composición y edición."
+            },
+            {
+                id: 8,
+                title: "Excel Avanzado",
+                category: "Negocios",
+                price: 60,
+                duration: "4 semanas",
+                icon: "📊",
+                description: "Domina Excel con fórmulas avanzadas, tablas dinámicas y automatización."
+            }
+        ];
+
+        // === INICIALIZACIÓN ===
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserData();
+            displayCourses(courses);
+        });
+
+        // === CARGAR DATOS DEL USUARIO ===
+        function loadUserData() {
+            const studentName = localStorage.getItem('studentName') || 'Estudiante';
+            document.getElementById('studentName').textContent = studentName;
+        }
+
+        // === MOSTRAR CURSOS ===
+        function displayCourses(coursesToShow) {
+            const coursesGrid = document.getElementById('coursesGrid');
+            const noResults = document.getElementById('noResults');
+            
+            if (coursesToShow.length === 0) {
+                coursesGrid.style.display = 'none';
+                noResults.style.display = 'block';
+                return;
+            }
+            
+            coursesGrid.style.display = 'grid';
+            noResults.style.display = 'none';
+            
+            coursesGrid.innerHTML = coursesToShow.map(course => `
+                <div class="course-card">
+                    <div class="course-icon">${course.icon}</div>
+                    <h3 class="course-title">${course.title}</h3>
+                    <span class="course-category">${course.category}</span>
+                    <p class="course-description">${course.description}</p>
+                    <div class="course-info">
+                        <span class="course-price">$${course.price}</span>
+                        <span class="course-duration">${course.duration}</span>
+                    </div>
+                    <button class="enroll-btn" onclick="enrollCourse(${course.id})">
+                        📝 Inscribirse Ahora
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // === FILTRAR CURSOS ===
+        function filterCourses() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const priceFilter = document.getElementById('priceFilter').value;
+            
+            let filteredCourses = courses.filter(course => {
+                const matchesSearch = course.title.toLowerCase().includes(searchTerm) || 
+                                    course.description.toLowerCase().includes(searchTerm);
+                const matchesCategory = !categoryFilter || course.category === categoryFilter;
+                const matchesPrice = !priceFilter || course.price <= parseInt(priceFilter);
+                
+                return matchesSearch && matchesCategory && matchesPrice;
+            });
+            
+            displayCourses(filteredCourses);
+        }
+
+        // === VARIABLES GLOBALES ===
+        let currentStep = 1;
+        let selectedCourse = null;
+
+        // === INSCRIBIRSE A CURSO ===
+        function enrollCourse(courseId) {
+            selectedCourse = courses.find(c => c.id === courseId);
+            showEnrollModal();
+        }
+
+        // === MOSTRAR MODAL ===
+        function showEnrollModal() {
+            const modal = document.getElementById('enrollModal');
+            modal.classList.add('active');
+            
+            // Llenar resumen del curso
+            const courseSummary = document.getElementById('courseSummary');
+            courseSummary.innerHTML = `
+                <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                    <span style="font-size: 2rem; margin-right: 1rem;">${selectedCourse.icon}</span>
+                    <div>
+                        <div class="summary-title">${selectedCourse.title}</div>
+                        <div style="color: #4a5568;">${selectedCourse.category} • ${selectedCourse.duration}</div>
+                    </div>
+                </div>
+                <div class="summary-price">Precio: $${selectedCourse.price}</div>
+            `;
+            
+            // Llenar datos del usuario en el formulario
+            const studentName = localStorage.getItem('studentName') || '';
+            const studentEmail = localStorage.getItem('studentEmail') || '';
+            const studentId = localStorage.getItem('studentId') || '';
+            
+            document.getElementById('fullName').value = studentName;
+            document.getElementById('email').value = studentEmail;
+            document.getElementById('studentId').value = studentId;
+            
+            // Resetear al paso 1
+            currentStep = 1;
+            updateStepDisplay();
+        }
+
+        // === CERRAR MODAL ===
+        function closeModal() {
+            const modal = document.getElementById('enrollModal');
+            modal.classList.remove('active');
+            currentStep = 1;
+            updateStepDisplay();
+        }
+
+        // === SIGUIENTE PASO ===
+        function nextStep() {
+            if (currentStep < 4) {
+                currentStep++;
+                updateStepDisplay();
+            }
+        }
+
+        // === PASO ANTERIOR ===
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepDisplay();
+            }
+        }
+
+        // === ACTUALIZAR DISPLAY DE PASOS ===
+        function updateStepDisplay() {
+            // Actualizar indicadores de pasos
+            for (let i = 1; i <= 4; i++) {
+                const step = document.getElementById(`step${i}`);
+                const stepContent = document.getElementById(`stepContent${i}`);
+                
+                step.classList.remove('active', 'completed');
+                stepContent.classList.remove('active');
+                
+                if (i < currentStep) {
+                    step.classList.add('completed');
+                } else if (i === currentStep) {
+                    step.classList.add('active');
+                    stepContent.classList.add('active');
+                }
+            }
+        }
+
+        // === PROCESAR PAGO ===
+        function processPayment() {
+            // Validar formulario
+            const form = document.getElementById('paymentForm');
+            if (!form.checkValidity()) {
+                alert('❌ Por favor completa todos los campos requeridos');
+                return;
+            }
+            
+            // Ir al paso de carga
+            currentStep = 3;
+            updateStepDisplay();
+            
+            // Simular procesamiento de pago (3 segundos)
+            setTimeout(() => {
+                // Guardar curso inscrito
+                let enrolledCourses = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
+                if (!enrolledCourses.find(c => c.id === selectedCourse.id)) {
+                    enrolledCourses.push({
+                        ...selectedCourse,
+                        enrolledDate: new Date().toISOString(),
+                        progress: 0
+                    });
+                    localStorage.setItem('enrolledCourses', JSON.stringify(enrolledCourses));
+                }
+                
+                // Ir al paso de éxito
+                currentStep = 4;
+                updateStepDisplay();
+            }, 3000);
+        }
+
+        // === IR A MIS CURSOS ===
+        function goToMyCourses() {
+            window.location.href = 'my-courses.html';
+        }
+
+        // === FORMATEAR NÚMERO DE TARJETA ===
+        document.addEventListener('DOMContentLoaded', function() {
+            const cardNumberInput = document.getElementById('cardNumber');
+            const expiryDateInput = document.getElementById('expiryDate');
+            
+            if (cardNumberInput) {
+                cardNumberInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\s/g, '').replace(/[^0-9]/gi, '');
+                    let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+                    e.target.value = formattedValue;
+                });
+            }
+            
+            if (expiryDateInput) {
+                expiryDateInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length >= 2) {
+                        value = value.substring(0, 2) + '/' + value.substring(2, 4);
+                    }
+                    e.target.value = value;
+                });
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98bbb2a0b38b465c',t:'MTc1OTk5MDA0Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Profesores - Hoot & Learn</title>
+    <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f7fafc;
+            color: #2d3748;
+            min-height: 100%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        /* === FONDO PROFESIONAL === */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #4a5568 100%);
+            z-index: -1;
+        }
+
+        .animated-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(102,126,234,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(118,75,162,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(34,197,94,0.05) 0%, transparent 50%);
+            animation: float 25s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-15px) rotate(1deg); }
+            66% { transform: translateY(-5px) rotate(-1deg); }
+        }
+
+        /* === CONTAINER PRINCIPAL === */
+        .main-container {
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .selection-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 4rem 3rem;
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .selection-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #22c55e 100%);
+        }
+
+        /* === HEADER === */
+        .header {
+            margin-bottom: 3rem;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .main-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .subtitle {
+            color: #4a5568;
+            font-size: 1.1rem;
+            font-weight: 500;
+            line-height: 1.6;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* === BOTONES PRINCIPALES === */
+        .buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin: 3rem 0;
+        }
+
+        .action-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 2rem 2.5rem;
+            border-radius: 16px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 1.3rem;
+            transition: all 0.4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            min-height: 80px;
+        }
+
+        .action-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.6s;
+        }
+
+        .action-button:hover::before {
+            left: 100%;
+        }
+
+        .action-button:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 35px rgba(102,126,234,0.4);
+        }
+
+        .action-button.register {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        .action-button.register:hover {
+            box-shadow: 0 15px 35px rgba(34,197,94,0.4);
+        }
+
+        .button-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .button-icon {
+            font-size: 2rem;
+        }
+
+        .button-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .button-description {
+            font-size: 0.95rem;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+
+        /* === DIVIDER === */
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 2.5rem 0;
+            color: #718096;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(160,174,192,0.3), transparent);
+        }
+
+        .divider span {
+            padding: 0 2rem;
+            background: rgba(255,255,255,0.95);
+        }
+
+        /* === INFORMACIÓN ADICIONAL === */
+        .info-section {
+            background: rgba(102,126,234,0.05);
+            border: 1px solid rgba(102,126,234,0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .info-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .info-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            text-align: left;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #4a5568;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .info-item-icon {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        /* === ENLACES DE AYUDA === */
+        .help-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .help-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border: 1px solid rgba(102,126,234,0.2);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            background: rgba(102,126,234,0.05);
+        }
+
+        .help-link:hover {
+            background: rgba(102,126,234,0.1);
+            border-color: rgba(102,126,234,0.4);
+            transform: translateY(-2px);
+        }
+
+        /* === FOOTER === */
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(160,174,192,0.2);
+        }
+
+        .back-link {
+            color: #4a5568;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            background: rgba(74,85,104,0.05);
+            border: 1px solid rgba(74,85,104,0.1);
+        }
+
+        .back-link:hover {
+            color: #2d3748;
+            background: rgba(74,85,104,0.1);
+            transform: translateY(-2px);
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+            
+            .selection-card {
+                padding: 2.5rem 2rem;
+            }
+            
+            .main-title {
+                font-size: 1.8rem;
+            }
+
+            .action-button {
+                padding: 1.5rem 2rem;
+                font-size: 1.1rem;
+            }
+
+            .button-icon {
+                font-size: 1.5rem;
+            }
+
+            .button-title {
+                font-size: 1.1rem;
+            }
+
+            .help-links {
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+            }
+
+            .info-list {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+
+        /* === ANIMACIONES === */
+        .selection-card {
+            animation: slideUp 0.8s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .action-button {
+            animation: fadeInUp 0.6s ease-out forwards;
+            opacity: 0;
+        }
+
+        .action-button:nth-child(1) {
+            animation-delay: 0.2s;
+        }
+
+        .action-button:nth-child(2) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* === EFECTOS HOVER ESPECIALES === */
+        .action-button {
+            box-shadow: 0 8px 25px rgba(102,126,234,0.2);
+        }
+
+        .action-button.register {
+            box-shadow: 0 8px 25px rgba(34,197,94,0.2);
+        }
+
+        .action-button:active {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <!-- === FONDO ANIMADO === -->
+    <div class="animated-bg"></div>
+
+    <!-- === CONTAINER PRINCIPAL === -->
+    <div class="main-container">
+        <div class="selection-card">
+            <!-- === HEADER === -->
+            <div class="header">
+                <div class="logo">Hoot & Learn</div>
+                <h1 class="main-title">
+                    <span>👨‍🏫</span>
+                    Portal de Profesores
+                </h1>
+                <p class="subtitle">
+                    Bienvenido al sistema de gestión educativa más avanzado. 
+                    Elige una opción para comenzar tu experiencia de enseñanza digital.
+                </p>
+            </div>
+
+            <!-- === BOTONES PRINCIPALES === -->
+            <div class="buttons-container">
+                <a href="teacher-login.html" class="action-button login">
+                    <div class="button-content">
+                        <div class="button-icon">🚀</div>
+                        <div class="button-title">Iniciar Sesión</div>
+                        <div class="button-description">Ya tengo una cuenta de profesor</div>
+                    </div>
+                </a>
+
+                <a href="teacher-register.html" class="action-button register">
+                    <div class="button-content">
+                        <div class="button-icon">✨</div>
+                        <div class="button-title">Crear Cuenta Nueva</div>
+                        <div class="button-description">Soy nuevo en la plataforma</div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- === DIVIDER === -->
+            <div class="divider">
+                <span>¿Qué puedes hacer como profesor?</span>
+            </div>
+
+            <!-- === INFORMACIÓN ADICIONAL === -->
+            <div class="info-section">
+                <div class="info-title">
+                    <span>🎯</span>
+                    Funcionalidades para Educadores
+                </div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-item-icon">📚</span>
+                        <span>Gestionar cursos y materiales</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-icon">👥</span>
+                        <span>Administrar estudiantes</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-icon">📊</span>
+                        <span>Crear evaluaciones y exámenes</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-icon">📈</span>
+                        <span>Analizar rendimiento académico</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-icon">💬</span>
+                        <span>Comunicación con estudiantes</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-icon">🎥</span>
+                        <span>Clases virtuales en vivo</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === ENLACES DE AYUDA === -->
+            <div class="help-links">
+                <a href="#" class="help-link" onclick="showSupport()">
+                    <span>📞</span>
+                    Soporte Técnico
+                </a>
+                <a href="#" class="help-link" onclick="showGuide()">
+                    <span>📖</span>
+                    Guía de Inicio
+                </a>
+                <a href="#" class="help-link" onclick="showDemo()">
+                    <span>🎬</span>
+                    Ver Demo
+                </a>
+            </div>
+
+            <!-- === FOOTER === -->
+            <div class="footer">
+                <a href="index.html" class="back-link">
+                    <span>←</span>
+                    Volver al inicio
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === INICIALIZACIÓN ===
+        document.addEventListener('DOMContentLoaded', function() {
+            showWelcomeAnimation();
+            setupEventListeners();
+        });
+
+        // === ANIMACIÓN DE BIENVENIDA ===
+        function showWelcomeAnimation() {
+            const card = document.querySelector('.selection-card');
+            card.style.transform = 'translateY(40px)';
+            card.style.opacity = '0';
+            
+            setTimeout(() => {
+                card.style.transition = 'all 0.8s ease-out';
+                card.style.transform = 'translateY(0)';
+                card.style.opacity = '1';
+            }, 100);
+        }
+
+        // === EVENT LISTENERS ===
+        function setupEventListeners() {
+            // Agregar efectos de hover mejorados
+            const buttons = document.querySelectorAll('.action-button');
+            
+            buttons.forEach(button => {
+                button.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-6px) scale(1.02)';
+                });
+                
+                button.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+        }
+
+        // === FUNCIONES DE AYUDA ===
+        function showSupport() {
+            showInfo('📞 Soporte Técnico 24/7:\n\n• Email: soporte@hootlearn.edu\n• Teléfono: +1 (555) 987-6543\n• WhatsApp: +1 (555) 123-4567\n• Chat en vivo: Disponible en el dashboard\n\n¡Estamos aquí para ayudarte en tu experiencia educativa!');
+        }
+
+        function showGuide() {
+            showInfo('📖 Recursos de Inicio:\n\n• Manual completo de profesor\n• Videos tutoriales paso a paso\n• Webinars semanales en vivo\n• Comunidad de educadores\n• Plantillas de cursos\n• Mejores prácticas pedagógicas\n\n¡Todo disponible una vez que inicies sesión!');
+        }
+
+        function showDemo() {
+            showInfo('🎬 Demo Interactivo:\n\n• Tour guiado de la plataforma\n• Ejemplos de cursos reales\n• Simulación de clases virtuales\n• Herramientas de evaluación\n• Panel de analíticas\n\n¡Descubre todo lo que puedes hacer como educador!');
+        }
+
+        function showInfo(message) {
+            // En una implementación real, usarías un sistema de notificaciones más sofisticado
+            alert('ℹ️ ' + message);
+        }
+
+        // === EFECTOS ADICIONALES ===
+        
+        // Efecto de partículas en el fondo (sutil)
+        function createFloatingElements() {
+            const container = document.querySelector('.animated-bg');
+            
+            for (let i = 0; i < 5; i++) {
+                const element = document.createElement('div');
+                element.style.position = 'absolute';
+                element.style.width = Math.random() * 4 + 2 + 'px';
+                element.style.height = element.style.width;
+                element.style.background = 'rgba(255,255,255,0.1)';
+                element.style.borderRadius = '50%';
+                element.style.left = Math.random() * 100 + '%';
+                element.style.top = Math.random() * 100 + '%';
+                element.style.animation = `float ${Math.random() * 10 + 15}s ease-in-out infinite`;
+                element.style.animationDelay = Math.random() * 5 + 's';
+                
+                container.appendChild(element);
+            }
+        }
+
+        // Ejecutar después de cargar
+        setTimeout(createFloatingElements, 1000);
+
+        // === ANALYTICS SIMULADOS ===
+        console.log('🎯 Portal de Profesores - Página de Selección');
+        console.log('📊 Opciones disponibles: Login y Registro');
+        console.log('🔗 Próximas páginas: teacher-login.html y teacher-register.html');
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98e4246cc79af02e',t:'MTc2MDQxNDEzOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

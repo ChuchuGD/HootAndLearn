@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login de Profesor - Hoot & Learn</title>
+    <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f7fafc;
+            color: #2d3748;
+            min-height: 100%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        /* === FONDO === */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #4a5568 100%);
+            z-index: -1;
+        }
+
+        .animated-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(34,197,94,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(102,126,234,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(118,75,162,0.05) 0%, transparent 50%);
+            animation: float 25s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-15px) rotate(1deg); }
+            66% { transform: translateY(-5px) rotate(-1deg); }
+        }
+
+        /* === CONTENEDOR === */
+        .login-container {
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .login-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 3rem;
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 50%, #667eea 100%);
+        }
+
+        /* === HEADER === */
+        .login-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-subtitle {
+            color: #4a5568;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        /* === FORMULARIO === */
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 0.9rem;
+        }
+
+        .form-input {
+            padding: 1rem 1.25rem;
+            border: 2px solid rgba(160,174,192,0.3);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.8);
+            color: #2d3748;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #22c55e;
+            box-shadow: 0 0 0 4px rgba(34,197,94,0.1);
+        }
+
+        /* === CONTENEDOR DE CONTRASEÑA === */
+        .password-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        /* 🔧 Espacio para el icono dentro del input */
+        .password-input-container .form-input {
+            padding-right: 2.8rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* 🔧 Ajuste visual del botón del ojo */
+        .password-toggle {
+            position: absolute;
+            right: 0.9rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #718096;
+            font-size: 1.2rem;
+            padding: 0;
+            width: 1.8rem;
+            height: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .password-toggle:hover {
+            color: #4a5568;
+            background: rgba(160,174,192,0.1);
+        }
+
+        /* === BOTONES === */
+        .login-btn, .nav-btn {
+            display: block;
+            width: 100%;
+            border: none;
+            border-radius: 12px;
+            padding: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            margin-top: 0.5rem;
+        }
+
+        .login-btn {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(34,197,94,0.4);
+        }
+
+        .nav-btn {
+            background: rgba(102,126,234,0.1);
+            color: #374151;
+            border: 1px solid rgba(102,126,234,0.3);
+        }
+
+        .nav-btn:hover {
+            background: rgba(102,126,234,0.2);
+            transform: translateY(-2px);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="animated-bg"></div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">🦉 Hoot & Learn</div>
+                <h2 class="login-title">Acceso de Profesor</h2>
+                <p class="login-subtitle">Inicia sesión con tu correo institucional</p>
+            </div>
+
+            <form class="login-form">
+                <!-- 🔧 Cambiado de Usuario a Correo -->
+                <div class="form-group">
+                    <label class="form-label">Correo electrónico</label>
+                    <input type="email" class="form-input" placeholder="ejemplo@instituto.edu.mx" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Contraseña</label>
+                    <div class="password-input-container">
+                        <input type="password" class="form-input" placeholder="Ingresa tu contraseña" required>
+                        <button type="button" class="password-toggle" onclick="togglePassword(this)">👁️</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="login-btn">Iniciar Sesión</button>
+
+                <!-- 🔹 Botones de navegación -->
+                <a href="boton-portal.html">
+                    <button type="button" class="nav-btn">🔙 Regresar a las opciones</button>
+                </a>
+                <a href="index.html">
+                    <button type="button" class="nav-btn">🏠 Regresar al inicio</button>
+                </a>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 👁️ Alternar visibilidad de la contraseña
+        function togglePassword(btn) {
+            const input = btn.previousElementSibling;
+            input.type = input.type === "password" ? "text" : "password";
+        }
+
+       document.addEventListener("DOMContentLoaded", function() {
+    const loginForm = document.querySelector(".login-form");
+
+    loginForm.addEventListener("submit", function(e) {
+        e.preventDefault(); // ❌ Evita recarga del formulario
+
+        // 🔹 Aquí podrías validar el correo y la contraseña si quieres
+        const email = loginForm.querySelector('input[type="email"]').value.trim();
+        const password = loginForm.querySelector('input[type="password"]').value;
+
+        if (!email || !password) {
+            alert("Por favor, completa todos los campos");
+            return;
+        }
+
+        // ✅ Redirección al dashboard
+        window.location.href = "dashboard-profesores.html";
+    });
+});
+    </script>
+</body>
+</html>

@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluaciones del Curso - Hoot & Learn</title>
+    <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f7fafc;
+            color: #2d3748;
+            min-height: 100%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        /* === FONDO ANIMADO === */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            z-index: -1;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* === HEADER === */
+        .header {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(20px);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-btn {
+            background: rgba(255,255,255,0.2);
+            color: #2d3748;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255,255,255,0.4);
+            transform: translateY(-2px);
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* === COURSE HEADER === */
+        .course-header {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 8px 32px rgba(102,126,234,0.1);
+        }
+
+        .course-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .course-stats {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #4a5568;
+            font-weight: 600;
+        }
+
+        /* === VISTAS === */
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* === EVALUATIONS LIST === */
+        .evaluations-section {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 8px 32px rgba(102,126,234,0.1);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .evaluations-grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .evaluation-card {
+            background: rgba(255,255,255,0.6);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.8);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .evaluation-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .evaluation-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .evaluation-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102,126,234,0.15);
+            background: rgba(255,255,255,0.8);
+        }
+
+        .evaluation-card.completed {
+            border-color: rgba(34,197,94,0.3);
+            background: rgba(34,197,94,0.05);
+        }
+
+        .evaluation-card.completed::before {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            transform: scaleX(1);
+        }
+
+        .evaluation-card.in-progress {
+            border-color: rgba(245,158,11,0.3);
+            background: rgba(245,158,11,0.05);
+        }
+
+        .evaluation-card.in-progress::before {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+            transform: scaleX(1);
+        }
+
+        .evaluation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .evaluation-info {
+            flex: 1;
+        }
+
+        .evaluation-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .evaluation-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            color: #667eea;
+        }
+
+        .status-completed {
+            color: #22c55e;
+        }
+
+        .status-in-progress {
+            color: #f59e0b;
+        }
+
+        .evaluation-description {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .evaluation-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .evaluation-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.9rem;
+            color: #4a5568;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .evaluation-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.3);
+        }
+
+        .action-btn.secondary {
+            background: rgba(255,255,255,0.8);
+            color: #4a5568;
+            border: 1px solid rgba(160,174,192,0.3);
+        }
+
+        .action-btn.secondary:hover {
+            background: rgba(255,255,255,1);
+            box-shadow: 0 5px 15px rgba(45,55,72,0.1);
+        }
+
+        .action-btn.completed {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        .action-btn:disabled {
+            background: rgba(160,174,192,0.5);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* === EVALUATION FORM === */
+        .evaluation-form-section {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 8px 32px rgba(102,126,234,0.1);
+        }
+
+        .evaluation-form-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(160,174,192,0.3);
+        }
+
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .timer-container {
+            background: rgba(245,158,11,0.1);
+            border: 1px solid rgba(245,158,11,0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .timer-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #f59e0b;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .timer-display {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #f59e0b;
+            font-family: 'Courier New', monospace;
+        }
+
+        .timer-display.warning {
+            color: #ef4444;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .question-container {
+            background: rgba(255,255,255,0.6);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+
+        .question-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .question-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .question-content {
+            flex: 1;
+        }
+
+        .question-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .question-type {
+            font-size: 0.8rem;
+            background: rgba(102,126,234,0.1);
+            color: #667eea;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .question-text {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .answer-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.8rem;
+            background: rgba(255,255,255,0.8);
+            border: 1px solid rgba(160,174,192,0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .option-item:hover {
+            background: rgba(102,126,234,0.05);
+            border-color: rgba(102,126,234,0.3);
+        }
+
+        .option-item.selected {
+            background: rgba(102,126,234,0.1);
+            border-color: #667eea;
+        }
+
+        .option-radio {
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #667eea;
+            border-radius: 50%;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .option-radio.selected::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0.5rem;
+            height: 0.5rem;
+            background: #667eea;
+            border-radius: 50%;
+        }
+
+        .answer-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 1rem;
+            border: 1px solid rgba(160,174,192,0.3);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.8);
+            color: #2d3748;
+            font-family: inherit;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .answer-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .file-upload-section {
+            background: rgba(255,255,255,0.6);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+
+        .file-upload-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .file-upload-area {
+            border: 2px dashed rgba(102,126,234,0.3);
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            background: rgba(102,126,234,0.05);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-upload-area:hover {
+            border-color: rgba(102,126,234,0.5);
+            background: rgba(102,126,234,0.1);
+        }
+
+        .file-upload-area.dragover {
+            border-color: #667eea;
+            background: rgba(102,126,234,0.15);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-text {
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .selected-file {
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .selected-file.show {
+            display: block;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #22c55e;
+            font-weight: 600;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(160,174,192,0.3);
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(34,197,94,0.3);
+        }
+
+        .submit-btn:disabled {
+            background: rgba(160,174,192,0.5);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .cancel-btn {
+            background: rgba(255,255,255,0.8);
+            color: #4a5568;
+            border: 1px solid rgba(160,174,192,0.3);
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+
+        .cancel-btn:hover {
+            background: rgba(255,255,255,1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(45,55,72,0.1);
+        }
+
+        /* === SUBMISSION MODAL === */
+        .submission-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .submission-modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 20px 60px rgba(102,126,234,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .close-btn {
+            background: rgba(239,68,68,0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239,68,68,0.2);
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(239,68,68,0.2);
+        }
+
+        .submission-summary {
+            background: rgba(102,126,234,0.05);
+            border: 1px solid rgba(102,126,234,0.2);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .summary-label {
+            color: #4a5568;
+            font-weight: 600;
+        }
+
+        .summary-value {
+            color: #2d3748;
+            font-weight: 700;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .confirm-btn {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .confirm-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(34,197,94,0.3);
+        }
+
+        /* === SUCCESS MESSAGE === */
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .success-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .success-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #22c55e;
+            margin-bottom: 0.5rem;
+        }
+
+        .success-text {
+            color: #4a5568;
+            margin-bottom: 2rem;
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .evaluation-form-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            
+            .timer-container {
+                align-self: stretch;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+            }
+            
+            .modal-content {
+                width: 95%;
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- === FONDO ANIMADO === -->
+    <div class="animated-bg"></div>
+
+    <!-- === HEADER === -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">Hoot & Learn</div>
+            <div class="nav-buttons">
+                <a href="my-courses.html" class="nav-btn">← Mis Cursos</a>
+                <a href="student-dashboard.html" class="nav-btn">Dashboard</a>
+                <a href="index.html" class="nav-btn">Cerrar Sesión</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- === MAIN CONTENT === -->
+    <main class="main-content">
+        <!-- === COURSE HEADER === -->
+        <section class="course-header">
+            <h1 class="course-title" id="courseTitle">
+                <span id="courseIcon">📊</span>
+                <span id="courseName">Cargando curso...</span>
+            </h1>
+            <div class="course-stats" id="courseStats">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </section>
+
+        <!-- === VISTA: LISTA DE EVALUACIONES === -->
+        <div class="view active" id="evaluationsListView">
+            <section class="evaluations-section">
+                <h2 class="section-title">
+                    <span>📋</span>
+                    Evaluaciones del Curso
+                </h2>
+                
+                <div class="evaluations-grid" id="evaluationsGrid">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+            </section>
+        </div>
+
+        <!-- === VISTA: FORMULARIO DE EVALUACIÓN === -->
+        <div class="view" id="evaluationFormView">
+            <section class="evaluation-form-section">
+                <div class="evaluation-form-header">
+                    <div>
+                        <h2 class="form-title" id="formTitle">Evaluación</h2>
+                        <p id="formDescription" style="color: #4a5568; margin-top: 0.5rem;"></p>
+                    </div>
+                    <div class="timer-container" id="timerContainer">
+                        <div class="timer-label">Tiempo Restante</div>
+                        <div class="timer-display" id="timerDisplay">60:00</div>
+                    </div>
+                </div>
+
+                <form id="evaluationForm">
+                    <div id="questionsContainer">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+
+                    <div class="file-upload-section" id="fileUploadSection" style="display: none;">
+                        <div class="file-upload-title">
+                            <span>📎</span>
+                            Archivo Adicional (Opcional)
+                        </div>
+                        <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+                            <div class="upload-icon">📄</div>
+                            <div class="upload-text">Haz clic aquí o arrastra tu archivo PDF</div>
+                            <div style="font-size: 0.9rem; color: #718096;">Formato: PDF (Max: 10MB)</div>
+                        </div>
+                        <input type="file" id="fileInput" class="file-input" accept=".pdf" onchange="handleFileSelect(event)">
+                        <div class="selected-file" id="selectedFile">
+                            <div class="file-info">
+                                <span>✅</span>
+                                <span id="fileName">archivo.pdf</span>
+                                <span id="fileSize">(2.5 MB)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn" onclick="cancelEvaluation()">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="submit-btn" id="submitBtn">
+                            <span>📤</span>
+                            Entregar Evaluación
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <!-- === MODAL DE CONFIRMACIÓN === -->
+    <div class="submission-modal" id="submissionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Confirmar Entrega</h3>
+                <button class="close-btn" onclick="closeSubmissionModal()">×</button>
+            </div>
+            
+            <div class="submission-summary" id="submissionSummary">
+                <!-- Se llenará dinámicamente -->
+            </div>
+
+            <p style="color: #4a5568; margin-bottom: 2rem;">
+                ⚠️ <strong>Importante:</strong> Una vez entregada la evaluación, no podrás modificar tus respuestas.
+            </p>
+
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeSubmissionModal()">
+                    Revisar Respuestas
+                </button>
+                <button class="confirm-btn" onclick="confirmSubmission()">
+                    Confirmar Entrega
+                </button>
+            </div>
+
+            <div class="success-message" id="successMessage">
+                <div class="success-icon">🎉</div>
+                <div class="success-title">¡Evaluación Entregada!</div>
+                <div class="success-text">Tu evaluación ha sido enviada correctamente. Recibirás los resultados pronto.</div>
+                <button class="confirm-btn" onclick="returnToList()">
+                    Volver a Evaluaciones
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === DATOS DE EJEMPLO ===
+        const sampleCourses = [
+            {
+                id: 1,
+                title: "JavaScript Fundamentals",
+                instructor: "Prof. Ana García",
+                icon: "💻",
+                evaluations: [
+                    {
+                        id: 1,
+                        title: "Examen Parcial - Fundamentos",
+                        description: "Evaluación sobre variables, funciones y estructuras de control en JavaScript.",
+                        status: "pending", // pending, in-progress, completed
+                        duration: 60, // minutos
+                        questions: 15,
+                        points: 100,
+                        dueDate: "2024-12-20",
+                        attempts: 1,
+                        requiresFile: false,
+                        questionsList: [
+                            {
+                                id: 1,
+                                type: "multiple-choice",
+                                question: "¿Cuál es la diferencia principal entre 'let' y 'var' en JavaScript?",
+                                options: [
+                                    "No hay diferencia, son sinónimos",
+                                    "'let' tiene scope de bloque, 'var' tiene scope de función",
+                                    "'var' es más moderno que 'let'",
+                                    "'let' solo se puede usar en funciones"
+                                ],
+                                correctAnswer: 1
+                            },
+                            {
+                                id: 2,
+                                type: "multiple-choice",
+                                question: "¿Qué valor retorna una función que no tiene declaración 'return'?",
+                                options: [
+                                    "null",
+                                    "undefined",
+                                    "0",
+                                    "false"
+                                ],
+                                correctAnswer: 1
+                            },
+                            {
+                                id: 3,
+                                type: "open-ended",
+                                question: "Explica qué es el 'hoisting' en JavaScript y proporciona un ejemplo práctico donde se pueda observar este comportamiento."
+                            },
+                            {
+                                id: 4,
+                                type: "multiple-choice",
+                                question: "¿Cuál de las siguientes es la forma correcta de declarar un array en JavaScript?",
+                                options: [
+                                    "let arr = [];",
+                                    "let arr = new Array();",
+                                    "let arr = Array();",
+                                    "Todas las anteriores son correctas"
+                                ],
+                                correctAnswer: 3
+                            },
+                            {
+                                id: 5,
+                                type: "open-ended",
+                                question: "Describe las diferencias entre los operadores '==' y '===' en JavaScript. Incluye ejemplos que demuestren cuándo cada uno sería más apropiado."
+                            }
+                        ]
+                    },
+                    {
+                        id: 2,
+                        title: "Proyecto Final - Aplicación Web",
+                        description: "Desarrollo de una aplicación web completa utilizando JavaScript, HTML y CSS.",
+                        status: "pending",
+                        duration: 120,
+                        questions: 8,
+                        points: 200,
+                        dueDate: "2024-12-25",
+                        attempts: 1,
+                        requiresFile: true,
+                        questionsList: [
+                            {
+                                id: 1,
+                                type: "open-ended",
+                                question: "Describe la arquitectura de tu aplicación web. Explica cómo organizaste el código JavaScript, la estructura HTML y los estilos CSS."
+                            },
+                            {
+                                id: 2,
+                                type: "open-ended",
+                                question: "¿Qué funcionalidades principales implementaste en tu aplicación? Detalla al menos 3 características importantes y cómo las desarrollaste."
+                            },
+                            {
+                                id: 3,
+                                type: "multiple-choice",
+                                question: "¿Qué patrón de diseño utilizaste para organizar tu código JavaScript?",
+                                options: [
+                                    "MVC (Model-View-Controller)",
+                                    "Módulos ES6",
+                                    "Funciones constructoras",
+                                    "Código procedural simple"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        id: 3,
+                        title: "Quiz - DOM Manipulation",
+                        description: "Evaluación rápida sobre manipulación del DOM con JavaScript.",
+                        status: "completed",
+                        duration: 30,
+                        questions: 10,
+                        points: 50,
+                        dueDate: "2024-12-15",
+                        attempts: 1,
+                        requiresFile: false,
+                        completedDate: "2024-12-14",
+                        score: 45,
+                        questionsList: [
+                            {
+                                id: 1,
+                                type: "multiple-choice",
+                                question: "¿Cuál es el método correcto para seleccionar un elemento por su ID?",
+                                options: [
+                                    "document.getElementById('id')",
+                                    "document.querySelector('#id')",
+                                    "document.getElement('id')",
+                                    "Ambas A y B son correctas"
+                                ],
+                                correctAnswer: 3
+                            }
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        let currentCourse = null;
+        let currentEvaluation = null;
+        let evaluationTimer = null;
+        let timeRemaining = 0;
+        let userAnswers = {};
+
+        // === INICIALIZACIÓN ===
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCourseFromURL();
+            setupModalEvents();
+        });
+
+        // === CARGAR CURSO DESDE URL ===
+        function loadCourseFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const courseId = urlParams.get('courseId');
+            const courseName = urlParams.get('courseName');
+
+            // Si no hay courseId en la URL, usar el primer curso como demo
+            if (!courseId) {
+                console.log('No courseId found, using demo course');
+                currentCourse = sampleCourses[0]; // Usar el primer curso como demo
+                loadCourseHeader();
+                loadEvaluations();
+                return;
+            }
+
+            currentCourse = sampleCourses.find(course => course.id == courseId);
+
+            if (!currentCourse) {
+                // Si no se encuentra el curso específico, usar el demo
+                console.log('Course not found, using demo course');
+                currentCourse = sampleCourses[0];
+            }
+
+            loadCourseHeader();
+            loadEvaluations();
+        }
+
+        // === CARGAR HEADER DEL CURSO ===
+        function loadCourseHeader() {
+            if (!currentCourse) return;
+
+            document.getElementById('courseIcon').textContent = currentCourse.icon;
+            document.getElementById('courseName').textContent = currentCourse.title;
+            document.title = `${currentCourse.title} - Evaluaciones - Hoot & Learn`;
+
+            const completedEvaluations = currentCourse.evaluations.filter(e => e.status === 'completed').length;
+            const totalEvaluations = currentCourse.evaluations.length;
+            const pendingEvaluations = currentCourse.evaluations.filter(e => e.status === 'pending').length;
+            const totalPoints = currentCourse.evaluations.reduce((sum, e) => sum + e.points, 0);
+
+            document.getElementById('courseStats').innerHTML = `
+                <div class="stat-item">
+                    <span>👨‍🏫</span>
+                    <span>${currentCourse.instructor}</span>
+                </div>
+                <div class="stat-item">
+                    <span>📊</span>
+                    <span>${completedEvaluations}/${totalEvaluations} completadas</span>
+                </div>
+                <div class="stat-item">
+                    <span>⏳</span>
+                    <span>${pendingEvaluations} pendientes</span>
+                </div>
+                <div class="stat-item">
+                    <span>🎯</span>
+                    <span>${totalPoints} puntos totales</span>
+                </div>
+            `;
+        }
+
+        // === CARGAR EVALUACIONES ===
+        function loadEvaluations() {
+            if (!currentCourse) return;
+
+            const evaluationsGrid = document.getElementById('evaluationsGrid');
+            const evaluations = currentCourse.evaluations;
+
+            if (evaluations.length === 0) {
+                evaluationsGrid.innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: #4a5568;">
+                        <div style="font-size: 4rem; margin-bottom: 1rem;">📋</div>
+                        <h3>No hay evaluaciones disponibles</h3>
+                        <p>Las evaluaciones aparecerán aquí cuando estén disponibles.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            evaluationsGrid.innerHTML = evaluations.map(evaluation => {
+                const statusIcons = {
+                    pending: '⏳',
+                    'in-progress': '📝',
+                    completed: '✅'
+                };
+
+                const statusTexts = {
+                    pending: 'Pendiente',
+                    'in-progress': 'En Progreso',
+                    completed: 'Completada'
+                };
+
+                return `
+                    <div class="evaluation-card ${evaluation.status}">
+                        <div class="evaluation-header">
+                            <div class="evaluation-info">
+                                <div class="evaluation-title">
+                                    📋 ${evaluation.title}
+                                </div>
+                                <div class="evaluation-status status-${evaluation.status}">
+                                    ${statusIcons[evaluation.status]}
+                                    ${statusTexts[evaluation.status]}
+                                    ${evaluation.score ? ` (${evaluation.score}/${evaluation.points})` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="evaluation-description">
+                            ${evaluation.description}
+                        </div>
+                        
+                        <div class="evaluation-details">
+                            <div class="evaluation-meta">
+                                <div class="meta-item">
+                                    <span>⏱️</span>
+                                    <span>${evaluation.duration} min</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span>❓</span>
+                                    <span>${evaluation.questions} preguntas</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span>🎯</span>
+                                    <span>${evaluation.points} puntos</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span>📅</span>
+                                    <span>Vence: ${formatDate(evaluation.dueDate)}</span>
+                                </div>
+                                ${evaluation.completedDate ? `
+                                <div class="meta-item">
+                                    <span>✅</span>
+                                    <span>Completado: ${formatDate(evaluation.completedDate)}</span>
+                                </div>
+                                ` : ''}
+                            </div>
+                            
+                            <div class="evaluation-actions">
+                                ${evaluation.status === 'completed' ? `
+                                    <button class="action-btn completed" onclick="viewResults(${evaluation.id})">
+                                        Ver Resultados
+                                    </button>
+                                ` : evaluation.status === 'in-progress' ? `
+                                    <button class="action-btn" onclick="continueEvaluation(${evaluation.id})">
+                                        Continuar
+                                    </button>
+                                ` : `
+                                    <button class="action-btn" onclick="startEvaluation(${evaluation.id})">
+                                        Comenzar Evaluación
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // === ACCIONES DE EVALUACIONES ===
+        function startEvaluation(evaluationId) {
+            currentEvaluation = currentCourse.evaluations.find(e => e.id === evaluationId);
+            if (!currentEvaluation) return;
+
+            // Cambiar vista
+            document.getElementById('evaluationsListView').classList.remove('active');
+            document.getElementById('evaluationFormView').classList.add('active');
+
+            // Configurar formulario
+            setupEvaluationForm();
+            
+            // Iniciar timer
+            startTimer();
+            
+            // Marcar como en progreso
+            currentEvaluation.status = 'in-progress';
+        }
+
+        function continueEvaluation(evaluationId) {
+            startEvaluation(evaluationId);
+        }
+
+        function viewResults(evaluationId) {
+            const evaluation = currentCourse.evaluations.find(e => e.id === evaluationId);
+            if (!evaluation) return;
+
+            alert(`📊 Resultados de: ${evaluation.title}\n\nCalificación: ${evaluation.score}/${evaluation.points} puntos\nEstado: Completada el ${formatDate(evaluation.completedDate)}\n\nEn una implementación real, esto mostraría un reporte detallado de la evaluación.`);
+        }
+
+        // === CONFIGURAR FORMULARIO ===
+        function setupEvaluationForm() {
+            if (!currentEvaluation) return;
+
+            document.getElementById('formTitle').textContent = currentEvaluation.title;
+            document.getElementById('formDescription').textContent = currentEvaluation.description;
+
+            // Configurar timer
+            timeRemaining = currentEvaluation.duration * 60; // convertir a segundos
+            updateTimerDisplay();
+
+            // Mostrar sección de archivo si es necesaria
+            const fileUploadSection = document.getElementById('fileUploadSection');
+            if (currentEvaluation.requiresFile) {
+                fileUploadSection.style.display = 'block';
+            } else {
+                fileUploadSection.style.display = 'none';
+            }
+
+            // Generar preguntas
+            generateQuestions();
+        }
+
+        // === GENERAR PREGUNTAS ===
+        function generateQuestions() {
+            const container = document.getElementById('questionsContainer');
+            const questions = currentEvaluation.questionsList;
+
+            container.innerHTML = questions.map((question, index) => {
+                if (question.type === 'multiple-choice') {
+                    return `
+                        <div class="question-container">
+                            <div class="question-header">
+                                <div class="question-number">${index + 1}</div>
+                                <div class="question-content">
+                                    <div class="question-title">
+                                        Pregunta ${index + 1}
+                                        <span class="question-type">Opción Múltiple</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="question-text">${question.question}</div>
+                            <div class="answer-options">
+                                ${question.options.map((option, optionIndex) => `
+                                    <div class="option-item" onclick="selectOption(${question.id}, ${optionIndex})">
+                                        <div class="option-radio" id="radio-${question.id}-${optionIndex}"></div>
+                                        <span>${option}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (question.type === 'open-ended') {
+                    return `
+                        <div class="question-container">
+                            <div class="question-header">
+                                <div class="question-number">${index + 1}</div>
+                                <div class="question-content">
+                                    <div class="question-title">
+                                        Pregunta ${index + 1}
+                                        <span class="question-type">Respuesta Abierta</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="question-text">${question.question}</div>
+                            <textarea 
+                                class="answer-textarea" 
+                                id="answer-${question.id}"
+                                placeholder="Escribe tu respuesta aquí..."
+                                oninput="saveOpenAnswer(${question.id}, this.value)"
+                            ></textarea>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // === MANEJAR RESPUESTAS ===
+        function selectOption(questionId, optionIndex) {
+            // Limpiar selecciones anteriores
+            document.querySelectorAll(`[id^="radio-${questionId}-"]`).forEach(radio => {
+                radio.classList.remove('selected');
+                radio.parentElement.classList.remove('selected');
+            });
+
+            // Seleccionar nueva opción
+            const selectedRadio = document.getElementById(`radio-${questionId}-${optionIndex}`);
+            selectedRadio.classList.add('selected');
+            selectedRadio.parentElement.classList.add('selected');
+
+            // Guardar respuesta
+            userAnswers[questionId] = optionIndex;
+        }
+
+        function saveOpenAnswer(questionId, answer) {
+            userAnswers[questionId] = answer;
+        }
+
+        // === TIMER ===
+        function startTimer() {
+            evaluationTimer = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+
+                if (timeRemaining <= 300) { // 5 minutos restantes
+                    document.getElementById('timerDisplay').classList.add('warning');
+                }
+
+                if (timeRemaining <= 0) {
+                    clearInterval(evaluationTimer);
+                    autoSubmitEvaluation();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            document.getElementById('timerDisplay').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function autoSubmitEvaluation() {
+            alert('⏰ El tiempo ha terminado. La evaluación se entregará automáticamente.');
+            submitEvaluation();
+        }
+
+        // === MANEJO DE ARCHIVOS ===
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (file.size > 10 * 1024 * 1024) {
+                alert('El archivo es demasiado grande. Máximo 10MB permitido.');
+                return;
+            }
+            
+            if (file.type !== 'application/pdf') {
+                alert('Solo se permiten archivos PDF.');
+                return;
+            }
+            
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = `(${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+            document.getElementById('selectedFile').classList.add('show');
+        }
+
+        // === ENVÍO DE EVALUACIÓN ===
+        function submitEvaluation() {
+            // Validar respuestas
+            const totalQuestions = currentEvaluation.questionsList.length;
+            const answeredQuestions = Object.keys(userAnswers).length;
+
+            if (answeredQuestions < totalQuestions) {
+                if (!confirm(`Has respondido ${answeredQuestions} de ${totalQuestions} preguntas. ¿Deseas entregar la evaluación de todas formas?`)) {
+                    return;
+                }
+            }
+
+            // Mostrar modal de confirmación
+            showSubmissionModal();
+        }
+
+        function showSubmissionModal() {
+            const modal = document.getElementById('submissionModal');
+            const summary = document.getElementById('submissionSummary');
+
+            const totalQuestions = currentEvaluation.questionsList.length;
+            const answeredQuestions = Object.keys(userAnswers).length;
+            const timeUsed = (currentEvaluation.duration * 60) - timeRemaining;
+            const timeUsedMinutes = Math.floor(timeUsed / 60);
+            const timeUsedSeconds = timeUsed % 60;
+
+            summary.innerHTML = `
+                <div class="summary-item">
+                    <span class="summary-label">Evaluación:</span>
+                    <span class="summary-value">${currentEvaluation.title}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Preguntas respondidas:</span>
+                    <span class="summary-value">${answeredQuestions}/${totalQuestions}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Tiempo utilizado:</span>
+                    <span class="summary-value">${timeUsedMinutes}:${timeUsedSeconds.toString().padStart(2, '0')}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Puntos posibles:</span>
+                    <span class="summary-value">${currentEvaluation.points} pts</span>
+                </div>
+                ${document.getElementById('selectedFile').classList.contains('show') ? `
+                <div class="summary-item">
+                    <span class="summary-label">Archivo adjunto:</span>
+                    <span class="summary-value">✅ ${document.getElementById('fileName').textContent}</span>
+                </div>
+                ` : ''}
+            `;
+
+            modal.classList.add('active');
+        }
+
+        function confirmSubmission() {
+            // Detener timer
+            if (evaluationTimer) {
+                clearInterval(evaluationTimer);
+            }
+
+            // Simular calificación automática (solo para demo)
+            const score = calculateScore();
+            
+            // Actualizar evaluación
+            currentEvaluation.status = 'completed';
+            currentEvaluation.completedDate = new Date().toISOString().split('T')[0];
+            currentEvaluation.score = score;
+
+            // Mostrar mensaje de éxito
+            document.getElementById('submissionSummary').style.display = 'none';
+            document.querySelector('.modal-actions').style.display = 'none';
+            document.querySelector('.submission-modal p').style.display = 'none';
+            document.getElementById('successMessage').classList.add('show');
+        }
+
+        function calculateScore() {
+            // Simulación simple de calificación
+            let correctAnswers = 0;
+            const multipleChoiceQuestions = currentEvaluation.questionsList.filter(q => q.type === 'multiple-choice');
+            
+            multipleChoiceQuestions.forEach(question => {
+                if (userAnswers[question.id] === question.correctAnswer) {
+                    correctAnswers++;
+                }
+            });
+
+            // Calcular puntuación basada en respuestas correctas de opción múltiple
+            // Las preguntas abiertas se califican manualmente (simulamos puntuación parcial)
+            const multipleChoiceScore = (correctAnswers / multipleChoiceQuestions.length) * 0.7; // 70% del puntaje
+            const openEndedScore = 0.25; // Simulamos 25% adicional por preguntas abiertas
+            
+            return Math.round((multipleChoiceScore + openEndedScore) * currentEvaluation.points);
+        }
+
+        // === FUNCIONES DE MODAL ===
+        function closeSubmissionModal() {
+            document.getElementById('submissionModal').classList.remove('active');
+        }
+
+        function returnToList() {
+            // Resetear formulario
+            userAnswers = {};
+            currentEvaluation = null;
+            
+            // Cambiar vista
+            document.getElementById('evaluationFormView').classList.remove('active');
+            document.getElementById('evaluationsListView').classList.add('active');
+            
+            // Cerrar modal
+            closeSubmissionModal();
+            
+            // Recargar lista
+            loadEvaluations();
+            loadCourseHeader();
+            
+            // Resetear modal
+            document.getElementById('submissionSummary').style.display = 'block';
+            document.querySelector('.modal-actions').style.display = 'flex';
+            document.querySelector('.submission-modal p').style.display = 'block';
+            document.getElementById('successMessage').classList.remove('show');
+        }
+
+        function cancelEvaluation() {
+            if (confirm('¿Estás seguro de que deseas cancelar la evaluación? Se perderá todo el progreso.')) {
+                if (evaluationTimer) {
+                    clearInterval(evaluationTimer);
+                }
+                
+                // Resetear estado si estaba en progreso
+                if (currentEvaluation && currentEvaluation.status === 'in-progress') {
+                    currentEvaluation.status = 'pending';
+                }
+                
+                returnToList();
+            }
+        }
+
+        // === EVENTOS ===
+        function setupModalEvents() {
+            document.getElementById('evaluationForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitEvaluation();
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeSubmissionModal();
+                }
+            });
+
+            document.getElementById('submissionModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeSubmissionModal();
+                }
+            });
+        }
+
+        // === UTILIDADES ===
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const options = { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            };
+            return date.toLocaleDateString('es-ES', options);
+        }
+
+        function showError(message) {
+            document.getElementById('courseName').textContent = 'Error';
+            document.getElementById('evaluationsGrid').innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: #4a5568;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">❌</div>
+                    <h3>${message}</h3>
+                    <p>Por favor, regresa a tus cursos e intenta nuevamente.</p>
+                    <a href="my-courses.html" style="display: inline-block; margin-top: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 2rem; border-radius: 10px; text-decoration: none; font-weight: 600;">
+                        ← Volver a Mis Cursos
+                    </a>
+                </div>
+            `;
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98c31ff5d3416b95',t:'MTc2MDA2NzkyNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

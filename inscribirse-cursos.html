@@ -694,80 +694,38 @@
 
     <script>
         // === DATOS DE CURSOS ===
-        const courses = [
-            {
-                id: 1,
-                title: "JavaScript Desde Cero",
-                category: "Programación",
-                price: 89,
-                duration: "8 semanas",
-                icon: "💻",
-                description: "Aprende JavaScript desde los fundamentos hasta conceptos avanzados. Perfecto para principiantes."
-            },
-            {
-                id: 2,
-                title: "Diseño UI/UX Profesional",
-                category: "Diseño",
-                price: 120,
-                duration: "6 semanas",
-                icon: "🎨",
-                description: "Domina las herramientas y principios del diseño de interfaces y experiencia de usuario."
-            },
-            {
-                id: 3,
-                title: "Marketing Digital Avanzado",
-                category: "Marketing",
-                price: 150,
-                duration: "10 semanas",
-                icon: "📈",
-                description: "Estrategias completas de marketing digital, SEO, SEM y redes sociales."
-            },
-            {
-                id: 4,
-                title: "Inglés Conversacional",
-                category: "Idiomas",
-                price: 75,
-                duration: "12 semanas",
-                icon: "🗣️",
-                description: "Mejora tu inglés conversacional con clases interactivas y práctica constante."
-            },
-            {
-                id: 5,
-                title: "Python para Data Science",
-                category: "Programación",
-                price: 200,
-                duration: "14 semanas",
-                icon: "🐍",
-                description: "Análisis de datos, machine learning y visualización con Python y sus librerías."
-            },
-            {
-                id: 6,
-                title: "Emprendimiento Digital",
-                category: "Negocios",
-                price: 180,
-                duration: "8 semanas",
-                icon: "🚀",
-                description: "Crea y lanza tu startup digital con metodologías probadas y casos reales."
-            },
-            {
-                id: 7,
-                title: "Fotografía Digital",
-                category: "Diseño",
-                price: 95,
-                duration: "6 semanas",
-                icon: "📸",
-                description: "Técnicas profesionales de fotografía digital, composición y edición."
-            },
-            {
-                id: 8,
-                title: "Excel Avanzado",
-                category: "Negocios",
-                price: 60,
-                duration: "4 semanas",
-                icon: "📊",
-                description: "Domina Excel con fórmulas avanzadas, tablas dinámicas y automatización."
-            }
-        ];
+        let courses = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadUserData();
+    loadCourses();
+});
+
+// === CARGAR CURSOS DESDE PHP ===
+function loadCourses() {
+    fetch('get_courses.php')
+        .then(response => response.json())
+        .then(data => {
+            courses = data;
+            displayCourses(courses);
+            loadCategories(courses);
+        })
+        .catch(error => {
+            console.error("Error al cargar los cursos:", error);
+        });
+}
+
+// === CARGAR CATEGORÍAS EN EL SELECT ===
+function loadCategories(coursesList) {
+    const categorySelect = document.getElementById('categoryFilter');
+    const categories = [...new Set(coursesList.map(c => c.category))]; // únicas
+
+    categorySelect.innerHTML = `
+        <option value="">Todas las categorías</option>
+        ${categories.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+    `;
+}
+
 
         // === INICIALIZACIÓN ===
         document.addEventListener('DOMContentLoaded', function() {

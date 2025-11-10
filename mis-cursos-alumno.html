@@ -557,47 +557,68 @@
     </div>
 
     <script>
-        // === DATOS DE EJEMPLO === 
-        const sampleCourses = [
-            {
-                id: 1,
-                title: "JavaScript Fundamentals",
-                instructor: "Prof. Ana García",
-                icon: "💻",
-                progress: 75,
-                lessons: 12,
-                completed: 9,
-                activities: [
-                    { date: "2024-12-15", title: "Proyecto Final", type: "assignment" },
-                    { date: "2024-12-20", title: "Examen Final", type: "exam" }
-                ]
-            },
-            {
-                id: 2,
-                title: "Diseño UI/UX",
-                instructor: "Prof. Carlos López",
-                icon: "🎨",
-                progress: 45,
-                lessons: 15,
-                completed: 7,
-                activities: [
-                    { date: "2024-12-12", title: "Wireframes", type: "assignment" },
-                    { date: "2024-12-18", title: "Prototipo", type: "assignment" }
-                ]
-            },
-            {
-                id: 3,
-                title: "Python Básico",
-                instructor: "Prof. María Rodríguez",
-                icon: "🐍",
-                progress: 90,
-                lessons: 10,
-                completed: 9,
-                activities: [
-                    { date: "2024-12-14", title: "Quiz Python", type: "quiz" }
-                ]
-            }
-        ];
+        // === DATOS DE EJEMPLO ===
+// === INICIALIZACIÓN ===
+document.addEventListener('DOMContentLoaded', function() {
+    loadUserData();
+    fetchCoursesFromDB();
+    loadCalendar();
+    loadActivities();
+});
+
+// === CARGAR CURSOS DESDE BD ===
+function fetchCoursesFromDB() {
+    const studentId = localStorage.getItem('studentId'); // lo guardas al iniciar sesión
+    fetch(`get_cursos_actuales.php?idAlumno=${studentId}`)
+        .then(response => response.json())
+        .then(data => {
+            coursesData = data;
+            loadCourses();
+        })
+        .catch(err => {
+            console.error("Error al obtener cursos:", err);
+        });
+}
+
+// === CARGAR CURSOS ===
+function loadCourses() {
+    const coursesGrid = document.getElementById('coursesGrid');
+
+    if (!coursesData || coursesData.length === 0) {
+        coursesGrid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: #4a5568;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
+                <h3>No tienes cursos inscritos</h3>
+                <p>¡Inscríbete a tu primer curso para comenzar a aprender!</p>
+                <a href="enroll-courses.html" style="display: inline-block; margin-top: 1rem; background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%); color: white; padding: 1rem 2rem; border-radius: 10px; text-decoration: none; font-weight: 600;">
+                    Explorar Cursos
+                </a>
+            </div>
+        `;
+        return;
+    }
+
+    coursesGrid.innerHTML = coursesData.map(course => `
+        <div class="course-card" onclick="openCourseModal('${course.IDCurso}')">
+            <div class="course-header">
+                <div class="course-icon">📘</div>
+                <div class="course-info">
+                    <div class="course-title">${course.NombreCurso}</div>
+                    <div class="course-instructor">${course.NombreMaestro}</div>
+                </div>
+            </div>
+            <div class="course-progress">
+                <div class="progress-label">
+                    <span>Tareas</span>
+                    <span>${course.TareasCargadas || 0}</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 60%"></div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
 
         let currentDate = new Date();
         let selectedCourse = null;

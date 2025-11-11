@@ -5,7 +5,7 @@ session_start();
 $servername = "127.0.0.1";
 $username = "root";
 $password = "2435";   
-$dbname = "hootlearn";
+$dbname = "HootLearn";
 
 // Crear la conexión
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -25,7 +25,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
     $contraseña = $_POST['contraseña'];
     
     // Verificar si el correo ya existe
-    $check_stmt = $conn->prepare("SELECT IDEst FROM estudianteregistro WHERE EstCorreo = ?");
+    $check_stmt = $conn->prepare("SELECT IDEst FROM EstudianteRegistro WHERE EstCorreo = ?");
     
     if ($check_stmt === false) {
         die("Error en la preparación de la consulta: " . $conn->error);
@@ -43,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
         $hashed_password = password_hash($contraseña, PASSWORD_DEFAULT);
         
         // Insertar nuevo estudiante
-        $stmt = $conn->prepare("INSERT INTO estudianteregistro (EstNombre, EstCorreo, Estpassword) VALUES (?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO EstudianteRegistro (EstNombre, EstCorreo, EstPassword) VALUES (?, ?, ?)");
         
         if ($stmt === false) {
             die("Error en la preparación de la consulta INSERT: " . $conn->error);
@@ -70,7 +70,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     $email = trim($_POST['login_email']);
     $password = $_POST['login_password'];
 
-    $stmt = $conn->prepare("SELECT IDEst, EstNombre, EstCorreo, Estpassword FROM estudianteregistro WHERE EstCorreo = ?");
+    $stmt = $conn->prepare("SELECT IDEst, EstNombre, EstCorreo, EstPassword FROM EstudianteRegistro WHERE EstCorreo = ?");
     
     if ($stmt === false) {
         die("Error en la preparación de la consulta LOGIN: " . $conn->error);
@@ -87,16 +87,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
         $passwordMatch = false;
         
         // Primero intentar con hash
-        if (password_verify($password, $user['Estpassword'])) {
+        if (password_verify($password, $user['EstPassword'])) {
             $passwordMatch = true;
         } 
         // Si falla, verificar si la contraseña está sin hash (para retrocompatibilidad)
-        elseif ($password === $user['Estpassword']) {
+        elseif ($password === $user['EstPassword']) {
             $passwordMatch = true;
             
             // Actualizar a contraseña hasheada
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $update_pass = $conn->prepare("UPDATE estudianteregistro SET Estpassword = ? WHERE IDEst = ?");
+            $update_pass = $conn->prepare("UPDATE EstudianteRegistro SET EstPassword = ? WHERE IDEst = ?");
             $update_pass->bind_param("si", $hashed, $user['IDEst']);
             $update_pass->execute();
             $update_pass->close();

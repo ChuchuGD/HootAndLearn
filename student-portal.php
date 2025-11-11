@@ -2,9 +2,9 @@
 session_start();
 
 // Configuración de la base de datos
-$servername = "127.0.0.1";
+$servername = "localhost";
 $username = "root";
-$password = "2435";   
+$password = "";
 $dbname = "hootlearn";
 
 // Crear la conexión
@@ -39,8 +39,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
         echo "<script>alert('❌ Este correo ya está registrado. Por favor inicia sesión.');</script>";
         $check_stmt->close();
     } else {
-        // Hash de la contraseña (SEGURIDAD)
-        $hashed_password = password_hash($contraseña, PASSWORD_DEFAULT);
         
         // Insertar nuevo estudiante
         $stmt = $conn->prepare("INSERT INTO estudianteregistro (EstNombre, EstCorreo, Estpassword) VALUES (?, ?, ?)");
@@ -49,7 +47,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
             die("Error en la preparación de la consulta INSERT: " . $conn->error);
         }
         
-        $stmt->bind_param("sss", $nombre, $correo, $hashed_password);
+        $stmt->bind_param("sss", $nombre, $correo, $contraseña);
         
         if ($stmt->execute()) {
             echo "<script>
@@ -83,23 +81,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     if ($result->num_rows > 0) {
         $user = $result->fetch_assoc();
         
-        // Verificar contraseña (compatible con hash y sin hash para testing)
         $passwordMatch = false;
         
-        // Primero intentar con hash
         if (password_verify($password, $user['Estpassword'])) {
             $passwordMatch = true;
         } 
-        // Si falla, verificar si la contraseña está sin hash (para retrocompatibilidad)
         elseif ($password === $user['Estpassword']) {
             $passwordMatch = true;
             
-            // Actualizar a contraseña hasheada
-            $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $update_pass = $conn->prepare("UPDATE estudianteregistro SET Estpassword = ? WHERE IDEst = ?");
-            $update_pass->bind_param("si", $hashed, $user['IDEst']);
-            $update_pass->execute();
-            $update_pass->close();
+        
         }
         
         if ($passwordMatch) {
@@ -116,7 +106,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
         } else {
             echo "<script>alert('❌ Contraseña incorrecta. Por favor intenta nuevamente.');</script>";
         }
-        header("Location: student-dashboard.php");
     } else {
         echo "<script>alert('❌ No existe una cuenta con este correo electrónico.');</script>";
     }
@@ -402,24 +391,24 @@ $conn->close();
  
 
     <!-- === PÁGINA DE LOGIN === -->
-    <div id="loginPage" class="page">
-        <button class="back-btn" onclick="showStudentHome()">← Regresar</button>
+<div id="loginPage" class="page">
+    <button class="back-btn" onclick="showStudentHome()">← Regresar</button>
+    
+    <h1 class="page-title">Iniciar Sesión</h1>
+    
+    <div class="form-container">
+        <form class="auth-form" method="POST" action="<?php echo $_SERVER['PHP_SELF']; ?>">
+            <input type="email" name="login_email" placeholder="Correo electrónico" required>
+            <input type="password" name="login_password" placeholder="Contraseña" required>
+            <button type="submit" name="login" class="cta-button">Iniciar Sesión</button>
+        </form>
         
-        <h1 class="page-title">Iniciar Sesión</h1>
-        
-        <div class="form-container">
-            <form class="auth-form" onsubmit="processLogin(event)">
-                <input type="email" placeholder="Correo electrónico" required>
-                <input type="password" placeholder="Contraseña" required>
-                <button type="submit" class="cta-button">Iniciar Sesión</button>
-            </form>
-            
-            <p style="margin-top: 2rem; color: #4a5568;">
-                ¿No tienes cuenta? 
-                <a href="#" onclick="showRegisterPage()" style="color: #5a67d8; text-decoration: none; font-weight: 600;">Regístrate aquí</a>
-            </p>
-        </div>
+        <p style="margin-top: 2rem; color: #4a5568;">
+            ¿No tienes cuenta? 
+            <a href="#" onclick="showRegisterPage()" style="color: #5a67d8; text-decoration: none; font-weight: 600;">Regístrate aquí</a>
+        </p>
     </div>
+</div>
 
     <script>
         // === NAVEGACIÓN ENTRE PÁGINAS ===
@@ -445,18 +434,7 @@ $conn->close();
         }
 
         // === PROCESAMIENTO DE FORMULARIOS ===
-        
-        function processRegister(event) {
-            event.preventDefault();
-            
-            // Simular registro exitoso
-            alert('¡Registro exitoso! 🎉\n\nTu cuenta ha sido creada correctamente.\nAhora serás redirigido para iniciar sesión.');
-            
-            // Redirigir automáticamente a login
-            setTimeout(() => {
-                showLoginPage();
-            }, 1000);
-        }
+
         
       function processLogin(event) {
     event.preventDefault();
@@ -473,17 +451,7 @@ $conn->close();
     
     // Extraer nombre del email (parte antes del @)
     const nombre = email.split('@')[0];
-    
-    // Guardar datos del usuario en localStorage
-    localStorage.setItem('studentName', nombre);
-    localStorage.setItem('studentEmail', email);
-    localStorage.setItem('studentId', 'EST-' + Math.random().toString(36).substr(2, 6).toUpperCase());
-    
-    // Mostrar mensaje de éxito
-    alert('✅ ¡Inicio de sesión exitoso!\n\n¡Bienvenido ' + nombre + '!\nSerás redirigido a tu dashboard.');
-    
-    // Redirigir al dashboard
-    window.location.href = 'student-dashboard.php';
+
 }
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98bb30c3a2bb6b95',t:'MTc1OTk4NDcyNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>

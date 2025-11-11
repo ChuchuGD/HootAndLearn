@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Profesor - Hoot & Learn</title>
+    <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f7fafc;
+            color: #2d3748;
+            min-height: 100%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        /* === FONDO PROFESIONAL === */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #4a5568 100%);
+            z-index: -1;
+        }
+
+        .animated-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(34,197,94,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(102,126,234,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(118,75,162,0.05) 0%, transparent 50%);
+            animation: float 25s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-15px) rotate(1deg); }
+            66% { transform: translateY(-5px) rotate(-1deg); }
+        }
+
+        /* === CONTAINER PRINCIPAL === */
+        .dashboard-container {
+            min-height: 100%;
+            padding: 2rem;
+        }
+
+        /* === HEADER === */
+        .dashboard-header {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 50%, #667eea 100%);
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .welcome-subtitle {
+            color: #4a5568;
+            font-size: 1.2rem;
+            font-weight: 500;
+            line-height: 1.5;
+        }
+
+        .user-info {
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.2);
+            color: #16a34a;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-top: 1.5rem;
+            display: inline-block;
+            font-weight: 600;
+        }
+
+        /* === OPCIONES PRINCIPALES === */
+        .dashboard-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .option-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 3rem 2rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .option-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.6s;
+        }
+
+        .option-card:hover::before {
+            left: 100%;
+        }
+
+        .option-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.2);
+        }
+
+        .option-card.mis-cursos {
+            border-top: 4px solid #22c55e;
+        }
+
+        .option-card.mis-cursos:hover {
+            box-shadow: 0 30px 80px rgba(34,197,94,0.3);
+        }
+
+        .option-card.asignaciones {
+            border-top: 4px solid #3b82f6;
+        }
+
+        .option-card.asignaciones:hover {
+            box-shadow: 0 30px 80px rgba(59,130,246,0.3);
+        }
+
+        .option-card.evaluaciones {
+            border-top: 4px solid #8b5cf6;
+        }
+
+        .option-card.evaluaciones:hover {
+            box-shadow: 0 30px 80px rgba(139,92,246,0.3);
+        }
+
+        .option-icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            display: block;
+        }
+
+        .option-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 1rem;
+        }
+
+        .option-description {
+            color: #4a5568;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .option-features {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            text-align: left;
+        }
+
+        .option-features li {
+            color: #718096;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .option-features li::before {
+            content: '✓';
+            color: #22c55e;
+            font-weight: bold;
+        }
+
+        .option-button {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            margin-top: 1.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .option-card.asignaciones .option-button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+
+        .option-card.evaluaciones .option-button {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+
+        .option-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        /* === FOOTER === */
+        .dashboard-footer {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-top: 3rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .logout-section {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .logout-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(239,68,68,0.4);
+        }
+
+        .back-link {
+            color: #4a5568;
+            text-decoration: none;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(160,174,192,0.3);
+        }
+
+        .back-link:hover {
+            color: #2d3748;
+            background: rgba(74,85,104,0.05);
+            border-color: rgba(160,174,192,0.5);
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 1rem;
+            }
+            
+            .dashboard-options {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            
+            .option-card {
+                padding: 2rem 1.5rem;
+            }
+            
+            .welcome-title {
+                font-size: 2rem;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .logout-section {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        /* === ANIMACIONES === */
+        .dashboard-header {
+            animation: slideDown 0.6s ease-out;
+        }
+
+        .option-card {
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .option-card:nth-child(1) { animation-delay: 0.1s; }
+        .option-card:nth-child(2) { animation-delay: 0.2s; }
+        .option-card:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- === FONDO ANIMADO === -->
+    <div class="animated-bg"></div>
+
+    <!-- === CONTAINER PRINCIPAL === -->
+    <div class="dashboard-container">
+        <!-- === HEADER === -->
+        <div class="dashboard-header">
+            <div class="logo">Hoot & Learn</div>
+            <h1 class="welcome-title">
+                <span>👨‍🏫</span>
+                Dashboard de Profesor
+            </h1>
+            <p class="welcome-subtitle">
+                Gestiona tus clases, asignaciones y evaluaciones desde un solo lugar
+            </p>
+            <div class="user-info" id="userInfo">
+                <span>👋</span>
+                Cargando información del usuario...
+            </div>
+        </div>
+
+        <!-- === OPCIONES PRINCIPALES === -->
+        <div class="dashboard-options">
+            <!-- OPCIÓN 1: MIS CURSOS -->
+            <a href="cursos/cursos_profesores.php" class="option-card mis-cursos">
+                <span class="option-icon">📚</span>
+                <h2 class="option-title">Mis Cursos</h2>
+                <p class="option-description">
+                    Administra todos tus cursos activos, estudiantes inscritos y contenido académico
+                </p>
+                <ul class="option-features">
+                    <li>Ver lista completa de cursos</li>
+                    <li>Gestionar estudiantes inscritos</li>
+                    <li>Subir material de clase</li>
+                    <li>Programar horarios</li>
+                </ul>
+                <button class="option-button">
+                    Acceder a Mis Cursos
+                </button>
+            </a>
+
+            <!-- OPCIÓN 2: ASIGNACIONES -->
+            <a href="asignaciones/asignaciones.php" class="option-card asignaciones">
+                <span class="option-icon">📝</span>
+                <h2 class="option-title">Asignaciones</h2>
+                <p class="option-description">
+                    Crea, gestiona y revisa todas las tareas y proyectos de tus estudiantes
+                </p>
+                <ul class="option-features">
+                    <li>Crear nuevas asignaciones</li>
+                    <li>Establecer fechas límite</li>
+                    <li>Revisar entregas</li>
+                    <li>Calificar trabajos</li>
+                </ul>
+                <button class="option-button">
+                    Gestionar Asignaciones
+                </button>
+            </a>
+
+            <!-- OPCIÓN 3: EVALUACIONES -->
+            <a href="evaluacion-profesor.html" class="option-card evaluaciones">
+                <span class="option-icon">📊</span>
+                <h2 class="option-title">Evaluaciones</h2>
+                <p class="option-description">
+                    Diseña exámenes, quizzes y evalúa el progreso académico de tus estudiantes
+                </p>
+                <ul class="option-features">
+                    <li>Crear exámenes y quizzes</li>
+                    <li>Banco de preguntas</li>
+                    <li>Calificaciones automáticas</li>
+                    <li>Reportes de rendimiento</li>
+                </ul>
+                <button class="option-button">
+                    Crear Evaluaciones
+                </button>
+            </a>
+        </div>
+
+        <!-- === FOOTER === -->
+        <div class="dashboard-footer">
+            <div class="logout-section">
+                <a href="teacher-login.html" class="back-link">
+                    <span>←</span>
+                    Volver al Login
+                </a>
+                <button class="logout-btn" onclick="logout()">
+                    <span>🚪</span>
+                    Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === INICIALIZACIÓN ===
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserInfo();
+            setupEventListeners();
+        });
+
+        // === VERIFICAR SESIÓN (DESHABILITADO PARA DEMO) ===
+        function checkUserSession() {
+            // Función deshabilitada para permitir acceso directo en demo
+            console.log('Verificación de sesión deshabilitada para demo');
+        }
+
+        // === CARGAR INFORMACIÓN DEL USUARIO ===
+        function loadUserInfo() {
+            try {
+                const session = JSON.parse(localStorage.getItem('currentTeacherSession'));
+                const userInfoDiv = document.getElementById('userInfo');
+                
+                if (session && session.fullName) {
+                    const loginTime = new Date(session.loginTime).toLocaleString('es-ES', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    userInfoDiv.innerHTML = `
+                        <span>👋</span>
+                        Bienvenido/a, <strong>${session.fullName}</strong><br>
+                        <small>Último acceso: ${loginTime}</small>
+                    `;
+                } else {
+                    userInfoDiv.innerHTML = `
+                        <span>👋</span>
+                        Bienvenido/a al Dashboard de Profesor
+                    `;
+                }
+            } catch (error) {
+                console.error('Error al cargar información del usuario:', error);
+            }
+        }
+
+        // === EVENT LISTENERS ===
+        function setupEventListeners() {
+            // Agregar efectos de hover y click a las tarjetas
+            const optionCards = document.querySelectorAll('.option-card');
+            
+            optionCards.forEach(card => {
+                card.addEventListener('click', function(e) {
+                    // Prevenir navegación inmediata para mostrar efecto
+                    e.preventDefault();
+                    
+                    // Agregar efecto visual
+                    this.style.transform = 'scale(0.95)';
+                    
+                    // Navegar después del efecto
+                    setTimeout(() => {
+                        window.location.href = this.href;
+                    }, 150);
+                });
+            });
+        }
+
+        // === CERRAR SESIÓN ===
+        function logout() {
+            // Confirmar logout
+            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                // Limpiar sesión
+                localStorage.removeItem('currentTeacherSession');
+                
+                // Mostrar mensaje de despedida
+                alert('👋 Sesión cerrada exitosamente. ¡Hasta pronto!');
+                
+                // Redirigir al login
+                window.location.href = 'teacher-login.html';
+            }
+        }
+
+        // === FUNCIONES AUXILIARES ===
+        function showNotification(message, type = 'info') {
+            // En una implementación real, usarías un sistema de notificaciones más sofisticado
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+            alert(icon + ' ' + message);
+        }
+
+        // === DEMO INFO ===
+        console.log('👨‍🏫 Dashboard de Profesor - Hoot & Learn');
+        console.log('📚 Opción 1: mis-cursos.html');
+        console.log('📝 Opción 2: asignaciones-profesor.html');
+        console.log('📊 Opción 3: evaluacion-profesor.html');
+        console.log('🔐 Verificación de sesión activa');
+        console.log('💾 Datos guardados en localStorage');
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9939f0f1250e5222',t:'MTc2MTMxMzgwNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

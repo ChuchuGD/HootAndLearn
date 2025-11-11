@@ -11,3 +11,4 @@ session_destroy();
 header("Location: student-portal.php");
 exit();
 ?>
+//hola a todos

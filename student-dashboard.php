@@ -139,7 +139,7 @@ estudiante registrado en la plataforma Hoot & Learn.
         }
 
         function goToMyCourses() {
-            window.location.href = 'my-courses.php';
+            window.location.href = 'mis-cursos-alumno.php';
         }
 
         function goToCertifications() {

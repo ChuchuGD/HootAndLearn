@@ -1,20 +1,33 @@
 <?php
-$conexion = new mysqli("127.0.0.1", "root", "2435", "Hoot&Learn", 3307);
+header('Content-Type: application/json');
 
-if ($conexion->connect_error) {
-    die("Error de conexión: " . $conexion->connect_error);
+// === CONEXIÓN A LA BASE DE DATOS ===
+$servername = "127.0.0.1";
+$username = "root";
+$password = "2435";
+$database = "Hoot&Learn";
+$port = 3307;
+
+$conn = new mysqli($servername, $username, $password, $database, $port);
+
+if ($conn->connect_error) {
+    die(json_encode(["error" => "Error de conexión: " . $conn->connect_error]));
 }
 
-$sql = "SELECT NombreCurso FROM CursosActuales";
-$resultado = $conexion->query($sql);
+// === CONSULTAR CURSOS ===
+$sql = "SELECT id_curso AS id, NombreCurso AS title, Categoria AS category, 
+                Descripcion AS description, Precio AS price, Duracion AS duration, 
+                Icono AS icon FROM CursosActuales";
+$result = $conn->query($sql);
 
-if ($resultado->num_rows > 0) {
-    while ($fila = $resultado->fetch_assoc()) {
-        echo $fila['NombreCurso'] . "<br>";
+$courses = [];
+
+if ($result && $result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $courses[] = $row;
     }
-} else {
-    echo "No hay cursos registrados.";
 }
 
-$conexion->close();
+echo json_encode($courses, JSON_UNESCAPED_UNICODE);
+$conn->close();
 ?>

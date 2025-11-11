@@ -1,6 +1,5 @@
 <?php
 header('Content-Type: application/json');
-//pito
 // === CONEXIÓN A LA BASE DE DATOS ===
 $servername = "127.0.0.1";
 $username = "root";

@@ -1,126 +1,23 @@
 <?php
 session_start();
 
-// Configuración de la base de datos
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "hootlearn";
-
-// Crear la conexión
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// Verificar la conexión
-if ($conn->connect_error) {
-    die("Conexión fallida: " . $conn->connect_error);
+// Verificar si el usuario está autenticado
+if (!isset($_SESSION['student_logged_in']) || $_SESSION['student_logged_in'] !== true) {
+    header("Location: student-portal.php");
+    exit();
 }
 
-// Configurar charset UTF-8
-$conn->set_charset("utf8mb4");
-
-// Proceso de registro de estudiante
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
-    $nombre = trim($_POST['nombre']);
-    $correo = trim($_POST['correo']);
-    $contraseña = $_POST['contraseña'];
-    
-    // Verificar si el correo ya existe
-    $check_stmt = $conn->prepare("SELECT IDEst FROM estudianteregistro WHERE EstCorreo = ?");
-    
-    if ($check_stmt === false) {
-        die("Error en la preparación de la consulta: " . $conn->error);
-    }
-    
-    $check_stmt->bind_param("s", $correo);
-    $check_stmt->execute();
-    $check_result = $check_stmt->get_result();
-    
-    if ($check_result->num_rows > 0) {
-        echo "<script>alert('❌ Este correo ya está registrado. Por favor inicia sesión.');</script>";
-        $check_stmt->close();
-    } else {
-        
-        // Insertar nuevo estudiante
-        $stmt = $conn->prepare("INSERT INTO estudianteregistro (EstNombre, EstCorreo, Estpassword) VALUES (?, ?, ?)");
-        
-        if ($stmt === false) {
-            die("Error en la preparación de la consulta INSERT: " . $conn->error);
-        }
-        
-        $stmt->bind_param("sss", $nombre, $correo, $contraseña);
-        
-        if ($stmt->execute()) {
-            echo "<script>
-                alert('¡Registro exitoso! 🎉\\n\\nTu cuenta ha sido creada correctamente.\\nAhora serás redirigido para iniciar sesión.');
-                setTimeout(function() {
-                    window.location.href = 'student-portal.php?action=login';
-                }, 1000);
-            </script>";
-        } else {
-            echo "<script>alert('❌ Error en el registro: " . addslashes($stmt->error) . "');</script>";
-        }
-        $stmt->close();
-    }
-}
-
-// Proceso de inicio de sesión de estudiante
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
-    $email = trim($_POST['login_email']);
-    $password = $_POST['login_password'];
-
-    $stmt = $conn->prepare("SELECT IDEst, EstNombre, EstCorreo, Estpassword FROM estudianteregistro WHERE EstCorreo = ?");
-    
-    if ($stmt === false) {
-        die("Error en la preparación de la consulta LOGIN: " . $conn->error);
-    }
-    
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows > 0) {
-        $user = $result->fetch_assoc();
-        
-        $passwordMatch = false;
-        
-        if (password_verify($password, $user['Estpassword'])) {
-            $passwordMatch = true;
-        } 
-        elseif ($password === $user['Estpassword']) {
-            $passwordMatch = true;
-            
-        
-        }
-        
-        if ($passwordMatch) {
-            // Crear sesión
-            $_SESSION['student_logged_in'] = true;
-            $_SESSION['student_id'] = $user['IDEst'];
-            $_SESSION['student_name'] = $user['EstNombre'];
-            $_SESSION['student_email'] = $user['EstCorreo'];
-            $_SESSION['login_time'] = date('Y-m-d H:i:s');
-            
-            // Redirigir al dashboard
-            header("Location: student-dashboard.php");
-            exit();
-        } else {
-            echo "<script>alert('❌ Contraseña incorrecta. Por favor intenta nuevamente.');</script>";
-        }
-    } else {
-        echo "<script>alert('❌ No existe una cuenta con este correo electrónico.');</script>";
-    }
-    $stmt->close();
-}
-
-$conn->close();
+// Obtener datos del estudiante
+$studentName = $_SESSION['student_name'];
+$studentEmail = $_SESSION['student_email'];
+$studentId = 'EST' . str_pad($_SESSION['student_id'], 3, '0', STR_PAD_LEFT);
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Estudiantes - Hoot & Learn</title>
-    
+    <title>Dashboard - Hoot & Learn</title>
     <style>
         body {
             box-sizing: border-box;
@@ -129,7 +26,6 @@ $conn->close();
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f7fafc;
             color: #2d3748;
-            overflow-x: hidden;
             min-height: 100%;
         }
 
@@ -156,18 +52,15 @@ $conn->close();
             100% { background-position: 0% 50%; }
         }
 
-        /* === NAVEGACIÓN === */
-        .navbar {
-            position: fixed;
-            top: 0;
-            width: 100%;
+        /* === HEADER === */
+        .header {
             background: rgba(255,255,255,0.2);
             backdrop-filter: blur(20px);
-            padding: 1rem 2rem;
-            z-index: 1000;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
         }
 
-        .nav-content {
+        .header-content {
             max-width: 1200px;
             margin: 0 auto;
             display: flex;
@@ -184,275 +77,286 @@ $conn->close();
             background-clip: text;
         }
 
-        /* === PÁGINAS === */
-        .page {
-            display: none;
-            min-height: 100vh;
-            padding: 8rem 2rem 2rem 2rem;
-            text-align: center;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .page.active {
+        .user-info {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .page-title {
+        .welcome-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .credential-btn {
+            background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(90, 103, 216, 0.2);
+        }
+
+        .credential-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(90, 103, 216, 0.3);
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .welcome-title {
             font-size: 3rem;
             font-weight: 800;
-            margin-bottom: 4rem;
-            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 50%, #5a67d8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
 
-        /* === OPCIONES === */
-        .options-container {
-            display: flex;
-            justify-content: center;
-            gap: 4rem;
-            flex-wrap: wrap;
-            max-width: 700px;
-            margin: 0 auto;
+        .welcome-subtitle {
+            font-size: 1.2rem;
+            color: #4a5568;
+            margin-bottom: 2rem;
+        }
+
+        /* === DASHBOARD OPTIONS === */
+        .dashboard-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
         }
 
         .option-card {
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255,255,255,0.8);
             backdrop-filter: blur(20px);
             border-radius: 25px;
             padding: 3rem 2rem;
-            width: 220px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.9);
             cursor: pointer;
             transition: all 0.4s ease;
-            border: 1px solid rgba(255,255,255,0.9);
             box-shadow: 0 8px 32px rgba(45,55,72,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .option-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #5a67d8, #667eea);
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+        }
+
+        .option-card:hover::before {
+            transform: scaleX(1);
         }
 
         .option-card:hover {
-            transform: translateY(-15px) scale(1.05);
-            box-shadow: 0 30px 80px rgba(45,55,72,0.2);
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(45,55,72,0.2);
             background: rgba(255,255,255,0.95);
         }
 
         .option-icon {
-            font-size: 5rem;
+            font-size: 4rem;
             margin-bottom: 1.5rem;
+            transition: all 0.4s ease;
         }
 
-        .option-text {
+        .option-card:hover .option-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .option-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
             color: #2d3748;
-            font-size: 1.6rem;
-            font-weight: 600;
-            margin: 0;
         }
 
-        /* === FORMULARIOS === */
-        .form-container {
-            max-width: 450px;
-            margin: 0 auto;
-            background: rgba(255,255,255,0.8);
-            backdrop-filter: blur(20px);
-            border-radius: 25px;
-            padding: 3rem;
-            border: 1px solid rgba(255,255,255,0.9);
-            box-shadow: 0 8px 32px rgba(45,55,72,0.1);
+        .option-description {
+            color: #4a5568;
+            line-height: 1.6;
         }
 
-        .auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .auth-form input {
-            padding: 1.2rem 1.5rem;
-            border: 1px solid rgba(45,55,72,0.2);
-            border-radius: 15px;
-            background: rgba(255,255,255,0.9);
-            font-size: 1rem;
-            color: #2d3748;
-            transition: all 0.3s ease;
-        }
-
-        .auth-form input:focus {
-            outline: none;
-            border-color: #5a67d8;
-            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.1);
-            background: rgba(255,255,255,1);
-        }
-
-        .cta-button {
-            background: linear-gradient(135deg, #4a5568 0%, #5a67d8 50%, #667eea 100%);
+        /* === LOGOUT BUTTON === */
+        .logout-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(239, 68, 68, 0.9);
             color: white;
             border: none;
-            padding: 1.2rem 2rem;
-            font-size: 1.1rem;
+            padding: 1rem 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
             font-weight: 600;
-            border-radius: 15px;
-            cursor: pointer;
-            transition: all 0.4s ease;
-            box-shadow: 0 4px 20px rgba(74, 85, 104, 0.2);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
         }
 
-        .cta-button:hover {
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 1);
             transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(74, 85, 104, 0.3);
-        }
-
-        /* === BOTÓN REGRESAR === */
-        .back-btn {
-            position: absolute;
-            top: 2rem;
-            left: 2rem;
-            background: rgba(255,255,255,0.8);
-            backdrop-filter: blur(10px);
-            color: #2d3748;
-            border: 1px solid rgba(255,255,255,0.9);
-            padding: 1rem 1.8rem;
-            border-radius: 30px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 500;
-            transition: all 0.4s ease;
-            box-shadow: 0 4px 16px rgba(45,55,72,0.1);
-        }
-
-        .back-btn:hover {
-            background: rgba(255,255,255,0.95);
-            transform: translateX(-3px);
         }
 
         /* === RESPONSIVE === */
         @media (max-width: 768px) {
-            .page-title {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .welcome-title {
                 font-size: 2rem;
             }
             
-            .options-container {
-                flex-direction: column;
-                align-items: center;
-                gap: 2rem;
-            }
-            
-            .form-container {
-                margin: 0 1rem;
-                padding: 2rem;
+            .dashboard-options {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <!-- === FONDO ANIMADO === -->
+    <!-- COPIA TODO EL HTML DE student-dashboard.html AQUÍ -->
+    
     <div class="animated-bg"></div>
 
-    <!-- === NAVEGACIÓN === -->
-    <nav class="navbar">
-        <div class="nav-content">
-            <div class="logo">Hoot & Learn - Estudiantes</div>
-        </div>
-    </nav>
-
-    <!-- === PÁGINA PRINCIPAL DE ESTUDIANTES === -->
-    <div id="studentHomePage" class="page active">
-        <h1 class="page-title">Portal de Estudiantes</h1>
-        
-        <div class="options-container">
-            <div class="option-card" onclick="showLoginPage()">
-                <div class="option-icon">🔑</div>
-                <p class="option-text">Iniciar Sesión</p>
-            </div>
-            
-            <div class="option-card" onclick="showRegisterPage()">
-                <div class="option-icon">📝</div>
-                <p class="option-text">Registrarse</p>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">Hoot & Learn</div>
+            <div class="user-info">
+                <span class="welcome-text">Hola, <span id="studentName"><?php echo htmlspecialchars($studentName); ?></span>!</span>
+                <button class="credential-btn" onclick="generateCredential()">
+                    📄 Mi Credencial
+                </button>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- === PÁGINA DE REGISTRO === -->
-    <div id="registerPage" class="page">
-        <button class="back-btn" onclick="showStudentHome()">← Regresar</button>
-        
-        <h1 class="page-title">Crear Cuenta de Estudiante</h1>
-        
-        <div class="form-container">
-            <form class="auth-form" method="POST" action="<?php echo $_SERVER['PHP_SELF']; ?>">
-                <input type="text" placeholder="Nombre completo" name="nombre" required>
-                <input type="email" placeholder="Correo electrónico" name="correo" required>
-                <input type="password" placeholder="Contraseña" name="contraseña" required>
-                <button type="submit" name="register" class="cta-button">Crear Cuenta</button> 
-            </form>
-        </div>
-    </div>
+    <main class="main-content">
+        <section class="welcome-section">
+            <h1 class="welcome-title">¡Bienvenido a tu Dashboard!</h1>
+            <p class="welcome-subtitle">
+                Aquí puedes gestionar todos tus cursos, certificaciones y más.
+            </p>
+        </section>
 
- 
+        <section class="dashboard-options">
+            <div class="option-card" onclick="goToEnrollCourses()">
+                <div class="option-icon">📚</div>
+                <h3 class="option-title">Inscribirse a Cursos</h3>
+                <p class="option-description">
+                    Explora y únete a nuevos cursos disponibles.
+                </p>
+            </div>
 
-    <!-- === PÁGINA DE LOGIN === -->
-<div id="loginPage" class="page">
-    <button class="back-btn" onclick="showStudentHome()">← Regresar</button>
-    
-    <h1 class="page-title">Iniciar Sesión</h1>
-    
-    <div class="form-container">
-        <form class="auth-form" method="POST" action="<?php echo $_SERVER['PHP_SELF']; ?>">
-            <input type="email" name="login_email" placeholder="Correo electrónico" required>
-            <input type="password" name="login_password" placeholder="Contraseña" required>
-            <button type="submit" name="login" class="cta-button">Iniciar Sesión</button>
-        </form>
-        
-        <p style="margin-top: 2rem; color: #4a5568;">
-            ¿No tienes cuenta? 
-            <a href="#" onclick="showRegisterPage()" style="color: #5a67d8; text-decoration: none; font-weight: 600;">Regístrate aquí</a>
-        </p>
-    </div>
-</div>
+            <div class="option-card" onclick="goToMyCourses()">
+                <div class="option-icon">🎯</div>
+                <h3 class="option-title">Ver Mis Cursos</h3>
+                <p class="option-description">
+                    Accede a tus cursos actuales y revisa tu progreso.
+                </p>
+            </div>
+
+            <div class="option-card" onclick="goToCertifications()">
+                <div class="option-icon">🏆</div>
+                <h3 class="option-title">Certificaciones</h3>
+                <p class="option-description">
+                    Consulta tus certificados obtenidos.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <button class="logout-btn" onclick="logout()">
+        🚪 Cerrar Sesión
+    </button>
 
     <script>
-        // === NAVEGACIÓN ENTRE PÁGINAS ===
-        
-        function showStudentHome() {
-            hideAllPages();
-            document.getElementById('studentHomePage').classList.add('active');
-        }
-        
-        function showRegisterPage() {
-            hideAllPages();
-            document.getElementById('registerPage').classList.add('active');
-        }
-        
-        function showLoginPage() {
-            hideAllPages();
-            document.getElementById('loginPage').classList.add('active');
-        }
-        
-        function hideAllPages() {
-            const pages = document.querySelectorAll('.page');
-            pages.forEach(page => page.classList.remove('active'));
+        // Datos del estudiante desde PHP
+        const studentData = {
+            name: <?php echo json_encode($studentName); ?>,
+            email: <?php echo json_encode($studentEmail); ?>,
+            id: <?php echo json_encode($studentId); ?>
+        };
+
+        function generateCredential() {
+            const credentialContent = `
+HOOT & LEARN
+CREDENCIAL DE ESTUDIANTE
+
+═══════════════════════════════════════
+
+👤 INFORMACIÓN DEL ESTUDIANTE
+
+Nombre: ${studentData.name}
+Email: ${studentData.email}
+ID de Estudiante: ${studentData.id}
+Fecha de Emisión: ${new Date().toLocaleDateString('es-ES')}
+
+═══════════════════════════════════════
+
+🎓 ESTADO: ACTIVO
+📅 Válida hasta: ${new Date(Date.now() + 365*24*60*60*1000).toLocaleDateString('es-ES')}
+
+Esta credencial certifica que el portador es un 
+estudiante registrado en la plataforma Hoot & Learn.
+
+═══════════════════════════════════════
+            `;
+
+            const blob = new Blob([credentialContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Credencial_${studentData.name}_${studentData.id}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            alert('📄 ¡Credencial descargada!\\n\\nTu credencial con ID: ' + studentData.id + ' ha sido descargada exitosamente.');
         }
 
-        // === PROCESAMIENTO DE FORMULARIOS ===
+        function goToEnrollCourses() {
+            window.location.href = 'enroll-courses.php';
+        }
 
-        
-      function processLogin(event) {
-    event.preventDefault();
-    
-    // Obtener datos del formulario
-    const email = event.target.querySelector('input[type="email"]').value;
-    const password = event.target.querySelector('input[type="password"]').value;
-    
-    // Validar que los campos no estén vacíos
-    if (!email || !password) {
-        alert('❌ Por favor completa todos los campos');
-        return;
-    }
-    
-    // Extraer nombre del email (parte antes del @)
-    const nombre = email.split('@')[0];
+        function goToMyCourses() {
+            window.location.href = 'my-courses.php';
+        }
 
-}
+        function goToCertifications() {
+            window.location.href = 'certifications.php';
+        }
+
+        function logout() {
+            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                window.location.href = 'logout.php';
+            }
+        }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98bb30c3a2bb6b95',t:'MTc1OTk4NDcyNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>

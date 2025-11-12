@@ -531,20 +531,6 @@
                     <div class="error-message" id="departmentError" style="display: none;"></div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="employeeId">
-                        <span>🪪</span>
-                        ID de Empleado (opcional)
-                    </label>
-                    <input 
-                        type="text"
-                        id="employeeId"
-                        class="form-input"
-                        placeholder="Ej. 123456"
-                    >
-                    <small class="form-hint">Tu número de empleado o identificación institucional</small>
-                    <div class="error-message" id="employeeIdError" style="display: none;"></div>
-                </div>
 
                 <div class="form-row">
                     <div class="form-group">
@@ -702,7 +688,7 @@
             const password = document.getElementById('password');
             const value = password.value;
 
-            if (!value) {
+            /*if (!value) {
                 showFieldError('password', 'La contraseña es obligatoria');
                 return false;
             }
@@ -716,7 +702,7 @@
                 showFieldError('password', 'La contraseña debe contener al menos una letra y un número');
                 return false;
             }
-            clearFieldError('password');
+            clearFieldError('password');*/
             return true;
         }
 

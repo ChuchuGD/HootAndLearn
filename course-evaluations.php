@@ -1,3 +1,182 @@
+<?php
+session_start();
+
+// Suponiendo que el ID del estudiante se almacena en la sesión
+// Si no tienes un sistema de login/sesión configurado, usa un ID de prueba (ej: 1)
+$studentId = $_SESSION['student_id'] ?? 1; // Usar ID 1 para demo si no hay sesión
+
+// ============================================
+// LÓGICA DE CONEXIÓN Y CONSULTA
+// ============================================
+
+// Incluir el archivo de conexión (usando los parámetros de conexion.php)
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "hootlearn";
+
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+if ($conn->connect_error) {
+    die("Error de conexión a la base de datos: " . $conn->connect_error);
+}
+$conn->set_charset("utf8mb4");
+
+// Obtener ID del curso de la URL
+$courseId = $_GET['courseId'] ?? null;
+
+if (!$courseId) {
+    // Si no hay ID de curso, redirigir o mostrar error
+    header("Location: my-courses.html");
+    exit();
+}
+
+// 1. OBTENER DATOS DEL CURSO
+$course_stmt = $conn->prepare("
+    SELECT 
+        c.NombreCurso, 
+        c.Icono, 
+        CONCAT(p.ProfNombre, ' ', p.ProfApellido) AS Instructor,
+        c.TotalLecciones
+    FROM cursos c
+    INNER JOIN profesorregistro p ON c.ProfID = p.ProfID
+    WHERE c.CursoID = ?
+");
+$course_stmt->bind_param("i", $courseId);
+$course_stmt->execute();
+$course_result = $course_stmt->get_result();
+$currentCourseData = $course_result->fetch_assoc();
+$course_stmt->close();
+
+if (!$currentCourseData) {
+    // Manejo de error si el curso no existe
+    echo "<script>alert('Curso no encontrado.'); window.location.href='my-courses.html';</script>";
+    exit();
+}
+
+// 2. OBTENER EVALUACIONES PARA ESTE CURSO Y SU ESTADO PARA EL ESTUDIANTE
+$evaluations_stmt = $conn->prepare("
+    SELECT 
+        e.EvaluacionID, 
+        e.Titulo, 
+        e.Descripcion, 
+        e.Duracion, 
+        e.Puntos, 
+        e.FechaVencimiento, 
+        e.TotalPreguntas AS QuestionsCount,
+        r.RespuestaID, 
+        r.Calificacion, 
+        r.Estado AS SubmissionStatus, 
+        r.FechaEntrega
+    FROM evaluaciones e
+    LEFT JOIN respuestas_evaluacion r ON e.EvaluacionID = r.EvaluacionID AND r.EstID = ?
+    WHERE e.CursoID = ? AND e.Activo = TRUE
+    ORDER BY e.FechaVencimiento ASC
+");
+$evaluations_stmt->bind_param("ii", $studentId, $courseId);
+$evaluations_stmt->execute();
+$evaluations_result = $evaluations_stmt->get_result();
+$evaluations = [];
+
+while ($row = $evaluations_result->fetch_assoc()) {
+    // Determinar el estado para la interfaz
+    $status = 'pending'; // Por defecto
+    if ($row['SubmissionStatus'] === 'en_progreso') {
+        $status = 'in-progress';
+    } elseif ($row['SubmissionStatus'] === 'completada' || $row['SubmissionStatus'] === 'calificada') {
+        $status = 'completed';
+    }
+    
+    // Si está pendiente y vencida, actualizar a 'overdue' (aunque 'pending' es suficiente para la UI)
+    $dueDate = new DateTime($row['FechaVencimiento']);
+    $today = new DateTime();
+
+    if ($status === 'pending' && $dueDate < $today) {
+        // En la BD no existe un estado 'vencida' directo, se infiere desde la fecha
+        // Pero para la UI, mantenemos 'pending' para que puedan iniciarla
+        // o si es un requerimiento, podríamos marcarla visualmente como vencida, 
+        // pero por simplicidad de la lógica de negocio la dejamos como 'pending'
+    }
+
+    $evaluations[] = [
+        'id' => $row['EvaluacionID'],
+        'title' => $row['Titulo'],
+        'description' => $row['Descripcion'],
+        'duration' => $row['Duracion'],
+        'questions' => $row['QuestionsCount'],
+        'points' => $row['Puntos'],
+        'dueDate' => $row['FechaVencimiento'],
+        'status' => $status,
+        'score' => $row['Calificacion'],
+        'completedDate' => $row['FechaEntrega']
+        // Aquí faltarían datos como preguntas, requiresFile, etc., que se obtienen en el JS
+    ];
+}
+$evaluations_stmt->close();
+
+// 3. OBTENER ESTADÍSTICAS DEL CURSO PARA EL HEADER
+$stats_stmt = $conn->prepare("
+    SELECT 
+        COUNT(e.EvaluacionID) AS TotalEvaluaciones,
+        SUM(CASE WHEN r.Estado = 'completada' OR r.Estado = 'calificada' THEN 1 ELSE 0 END) AS CompletedEvaluations,
+        SUM(e.Puntos) AS TotalPoints
+    FROM evaluaciones e
+    LEFT JOIN respuestas_evaluacion r ON e.EvaluacionID = r.EvaluacionID AND r.EstID = ?
+    WHERE e.CursoID = ? AND e.Activo = TRUE
+");
+$stats_stmt->bind_param("ii", $studentId, $courseId);
+$stats_stmt->execute();
+$stats_result = $stats_stmt->get_result();
+$stats = $stats_result->fetch_assoc();
+$stats_stmt->close();
+
+
+// 4. OBTENER LAS PREGUNTAS COMPLETAS (Para JS)
+$questions_data = [];
+$questions_stmt = $conn->prepare("
+    SELECT 
+        pe.EvaluacionID, 
+        pe.PreguntaID, 
+        pe.TipoPregunta, 
+        pe.TextoPregunta, 
+        pe.Opciones, 
+        e.RequiereArchivo
+    FROM preguntas_evaluacion pe
+    INNER JOIN evaluaciones e ON pe.EvaluacionID = e.EvaluacionID
+    WHERE e.CursoID = ? AND e.Activo = TRUE
+    ORDER BY pe.EvaluacionID, pe.Orden
+");
+$questions_stmt->bind_param("i", $courseId);
+$questions_stmt->execute();
+$questions_result = $questions_stmt->get_result();
+
+while ($q_row = $questions_result->fetch_assoc()) {
+    $evalId = $q_row['EvaluacionID'];
+    if (!isset($questions_data[$evalId])) {
+        $questions_data[$evalId] = [
+            'requiresFile' => $q_row['RequiereArchivo'],
+            'questionsList' => []
+        ];
+    }
+
+    $questions_data[$evalId]['questionsList'][] = [
+        'id' => $q_row['PreguntaID'],
+        'type' => $q_row['TipoPregunta'],
+        'question' => $q_row['TextoPregunta'],
+        'options' => json_decode($q_row['Opciones'], true), // Convertir JSON a array PHP
+    ];
+}
+$questions_stmt->close();
+$conn->close();
+
+// Codificar datos PHP para ser usados en JavaScript
+$currentCourseJSON = json_encode($currentCourseData);
+$evaluationsJSON = json_encode($evaluations);
+$statsJSON = json_encode($stats);
+$questionsDataJSON = json_encode($questions_data);
+
+
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -5,6 +184,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Evaluaciones del Curso - Hoot & Learn</title>
     <style>
+        /* ... (Todo el CSS original de course-evaluations.html sin cambios) ... */
         body {
             box-sizing: border-box;
             margin: 0;
@@ -797,10 +977,8 @@
     </style>
 </head>
 <body>
-    <!-- === FONDO ANIMADO === -->
     <div class="animated-bg"></div>
 
-    <!-- === HEADER === -->
     <header class="header">
         <div class="header-content">
             <div class="logo">Hoot & Learn</div>
@@ -812,20 +990,16 @@
         </div>
     </header>
 
-    <!-- === MAIN CONTENT === -->
     <main class="main-content">
-        <!-- === COURSE HEADER === -->
         <section class="course-header">
             <h1 class="course-title" id="courseTitle">
-                <span id="courseIcon">📊</span>
-                <span id="courseName">Cargando curso...</span>
+                <span id="courseIcon"><?php echo htmlspecialchars($currentCourseData['Icono'] ?? '📊'); ?></span>
+                <span id="courseName"><?php echo htmlspecialchars($currentCourseData['NombreCurso'] ?? 'Curso no encontrado'); ?></span>
             </h1>
             <div class="course-stats" id="courseStats">
-                <!-- Se llenará dinámicamente -->
-            </div>
+                </div>
         </section>
 
-        <!-- === VISTA: LISTA DE EVALUACIONES === -->
         <div class="view active" id="evaluationsListView">
             <section class="evaluations-section">
                 <h2 class="section-title">
@@ -834,12 +1008,10 @@
                 </h2>
                 
                 <div class="evaluations-grid" id="evaluationsGrid">
-                    <!-- Se llenará dinámicamente -->
-                </div>
+                    </div>
             </section>
         </div>
 
-        <!-- === VISTA: FORMULARIO DE EVALUACIÓN === -->
         <div class="view" id="evaluationFormView">
             <section class="evaluation-form-section">
                 <div class="evaluation-form-header">
@@ -854,9 +1026,9 @@
                 </div>
 
                 <form id="evaluationForm">
+                    <input type="hidden" id="formEvaluationId">
                     <div id="questionsContainer">
-                        <!-- Se llenará dinámicamente -->
-                    </div>
+                        </div>
 
                     <div class="file-upload-section" id="fileUploadSection" style="display: none;">
                         <div class="file-upload-title">
@@ -892,7 +1064,6 @@
         </div>
     </main>
 
-    <!-- === MODAL DE CONFIRMACIÓN === -->
     <div class="submission-modal" id="submissionModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -901,8 +1072,7 @@
             </div>
             
             <div class="submission-summary" id="submissionSummary">
-                <!-- Se llenará dinámicamente -->
-            </div>
+                </div>
 
             <p style="color: #4a5568; margin-bottom: 2rem;">
                 ⚠️ <strong>Importante:</strong> Una vez entregada la evaluación, no podrás modificar tus respuestas.
@@ -929,142 +1099,14 @@
     </div>
 
     <script>
-        // === DATOS DE EJEMPLO ===
-        const sampleCourses = [
-            {
-                id: 1,
-                title: "JavaScript Fundamentals",
-                instructor: "Prof. Ana García",
-                icon: "💻",
-                evaluations: [
-                    {
-                        id: 1,
-                        title: "Examen Parcial - Fundamentos",
-                        description: "Evaluación sobre variables, funciones y estructuras de control en JavaScript.",
-                        status: "pending", // pending, in-progress, completed
-                        duration: 60, // minutos
-                        questions: 15,
-                        points: 100,
-                        dueDate: "2024-12-20",
-                        attempts: 1,
-                        requiresFile: false,
-                        questionsList: [
-                            {
-                                id: 1,
-                                type: "multiple-choice",
-                                question: "¿Cuál es la diferencia principal entre 'let' y 'var' en JavaScript?",
-                                options: [
-                                    "No hay diferencia, son sinónimos",
-                                    "'let' tiene scope de bloque, 'var' tiene scope de función",
-                                    "'var' es más moderno que 'let'",
-                                    "'let' solo se puede usar en funciones"
-                                ],
-                                correctAnswer: 1
-                            },
-                            {
-                                id: 2,
-                                type: "multiple-choice",
-                                question: "¿Qué valor retorna una función que no tiene declaración 'return'?",
-                                options: [
-                                    "null",
-                                    "undefined",
-                                    "0",
-                                    "false"
-                                ],
-                                correctAnswer: 1
-                            },
-                            {
-                                id: 3,
-                                type: "open-ended",
-                                question: "Explica qué es el 'hoisting' en JavaScript y proporciona un ejemplo práctico donde se pueda observar este comportamiento."
-                            },
-                            {
-                                id: 4,
-                                type: "multiple-choice",
-                                question: "¿Cuál de las siguientes es la forma correcta de declarar un array en JavaScript?",
-                                options: [
-                                    "let arr = [];",
-                                    "let arr = new Array();",
-                                    "let arr = Array();",
-                                    "Todas las anteriores son correctas"
-                                ],
-                                correctAnswer: 3
-                            },
-                            {
-                                id: 5,
-                                type: "open-ended",
-                                question: "Describe las diferencias entre los operadores '==' y '===' en JavaScript. Incluye ejemplos que demuestren cuándo cada uno sería más apropiado."
-                            }
-                        ]
-                    },
-                    {
-                        id: 2,
-                        title: "Proyecto Final - Aplicación Web",
-                        description: "Desarrollo de una aplicación web completa utilizando JavaScript, HTML y CSS.",
-                        status: "pending",
-                        duration: 120,
-                        questions: 8,
-                        points: 200,
-                        dueDate: "2024-12-25",
-                        attempts: 1,
-                        requiresFile: true,
-                        questionsList: [
-                            {
-                                id: 1,
-                                type: "open-ended",
-                                question: "Describe la arquitectura de tu aplicación web. Explica cómo organizaste el código JavaScript, la estructura HTML y los estilos CSS."
-                            },
-                            {
-                                id: 2,
-                                type: "open-ended",
-                                question: "¿Qué funcionalidades principales implementaste en tu aplicación? Detalla al menos 3 características importantes y cómo las desarrollaste."
-                            },
-                            {
-                                id: 3,
-                                type: "multiple-choice",
-                                question: "¿Qué patrón de diseño utilizaste para organizar tu código JavaScript?",
-                                options: [
-                                    "MVC (Model-View-Controller)",
-                                    "Módulos ES6",
-                                    "Funciones constructoras",
-                                    "Código procedural simple"
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        id: 3,
-                        title: "Quiz - DOM Manipulation",
-                        description: "Evaluación rápida sobre manipulación del DOM con JavaScript.",
-                        status: "completed",
-                        duration: 30,
-                        questions: 10,
-                        points: 50,
-                        dueDate: "2024-12-15",
-                        attempts: 1,
-                        requiresFile: false,
-                        completedDate: "2024-12-14",
-                        score: 45,
-                        questionsList: [
-                            {
-                                id: 1,
-                                type: "multiple-choice",
-                                question: "¿Cuál es el método correcto para seleccionar un elemento por su ID?",
-                                options: [
-                                    "document.getElementById('id')",
-                                    "document.querySelector('#id')",
-                                    "document.getElement('id')",
-                                    "Ambas A y B son correctas"
-                                ],
-                                correctAnswer: 3
-                            }
-                        ]
-                    }
-                ]
-            }
-        ];
+        // === DATOS PROVENIENTES DE PHP ===
+        const currentCourseData = <?php echo $currentCourseJSON; ?>;
+        const evaluations = <?php echo $evaluationsJSON; ?>;
+        const courseStats = <?php echo $statsJSON; ?>;
+        const questionsData = <?php echo $questionsDataJSON; ?>;
+        const studentId = <?php echo $studentId; ?>;
+        const courseId = <?php echo $courseId; ?>;
 
-        let currentCourse = null;
         let currentEvaluation = null;
         let evaluationTimer = null;
         let timeRemaining = 0;
@@ -1072,77 +1114,37 @@
 
         // === INICIALIZACIÓN ===
         document.addEventListener('DOMContentLoaded', function() {
-            loadCourseFromURL();
+            loadCourseHeader();
+            loadEvaluations();
             setupModalEvents();
         });
 
-        // === CARGAR CURSO DESDE URL ===
-        function loadCourseFromURL() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const courseId = urlParams.get('courseId');
-            const courseName = urlParams.get('courseName');
-
-            // Si no hay courseId en la URL, usar el primer curso como demo
-            if (!courseId) {
-                console.log('No courseId found, using demo course');
-                currentCourse = sampleCourses[0]; // Usar el primer curso como demo
-                loadCourseHeader();
-                loadEvaluations();
-                return;
-            }
-
-            currentCourse = sampleCourses.find(course => course.id == courseId);
-
-            if (!currentCourse) {
-                // Si no se encuentra el curso específico, usar el demo
-                console.log('Course not found, using demo course');
-                currentCourse = sampleCourses[0];
-            }
-
-            loadCourseHeader();
-            loadEvaluations();
-        }
-
         // === CARGAR HEADER DEL CURSO ===
         function loadCourseHeader() {
-            if (!currentCourse) return;
-
-            document.getElementById('courseIcon').textContent = currentCourse.icon;
-            document.getElementById('courseName').textContent = currentCourse.title;
-            document.title = `${currentCourse.title} - Evaluaciones - Hoot & Learn`;
-
-            const completedEvaluations = currentCourse.evaluations.filter(e => e.status === 'completed').length;
-            const totalEvaluations = currentCourse.evaluations.length;
-            const pendingEvaluations = currentCourse.evaluations.filter(e => e.status === 'pending').length;
-            const totalPoints = currentCourse.evaluations.reduce((sum, e) => sum + e.points, 0);
-
             document.getElementById('courseStats').innerHTML = `
                 <div class="stat-item">
                     <span>👨‍🏫</span>
-                    <span>${currentCourse.instructor}</span>
+                    <span>${currentCourseData.Instructor}</span>
                 </div>
                 <div class="stat-item">
                     <span>📊</span>
-                    <span>${completedEvaluations}/${totalEvaluations} completadas</span>
+                    <span>${courseStats.CompletedEvaluations || 0}/${courseStats.TotalEvaluaciones || 0} completadas</span>
                 </div>
                 <div class="stat-item">
                     <span>⏳</span>
-                    <span>${pendingEvaluations} pendientes</span>
+                    <span>${(courseStats.TotalEvaluaciones || 0) - (courseStats.CompletedEvaluations || 0)} pendientes</span>
                 </div>
                 <div class="stat-item">
                     <span>🎯</span>
-                    <span>${totalPoints} puntos totales</span>
+                    <span>${courseStats.TotalPoints || 0} puntos totales</span>
                 </div>
             `;
         }
 
         // === CARGAR EVALUACIONES ===
         function loadEvaluations() {
-            if (!currentCourse) return;
-
             const evaluationsGrid = document.getElementById('evaluationsGrid');
-            const evaluations = currentCourse.evaluations;
-
+            
             if (evaluations.length === 0) {
                 evaluationsGrid.innerHTML = `
                     <div style="text-align: center; padding: 3rem; color: #4a5568;">
@@ -1167,8 +1169,16 @@
                     completed: 'Completada'
                 };
 
+                // Determinar si está vencida
+                const dueDate = new Date(evaluation.dueDate);
+                const today = new Date();
+                const isOverdue = evaluation.status === 'pending' && dueDate < today;
+                
+                let cardClass = evaluation.status;
+                if (isOverdue) cardClass = 'overdue'; // Clase visual para vencida
+
                 return `
-                    <div class="evaluation-card ${evaluation.status}">
+                    <div class="evaluation-card ${cardClass}">
                         <div class="evaluation-header">
                             <div class="evaluation-info">
                                 <div class="evaluation-title">
@@ -1177,7 +1187,8 @@
                                 <div class="evaluation-status status-${evaluation.status}">
                                     ${statusIcons[evaluation.status]}
                                     ${statusTexts[evaluation.status]}
-                                    ${evaluation.score ? ` (${evaluation.score}/${evaluation.points})` : ''}
+                                    ${evaluation.score ? ` (${Math.round(evaluation.score)}/${evaluation.points})` : ''}
+                                    ${isOverdue && evaluation.status === 'pending' ? ' (Vencida)' : ''}
                                 </div>
                             </div>
                         </div>
@@ -1234,39 +1245,55 @@
         }
 
         // === ACCIONES DE EVALUACIONES ===
-        function startEvaluation(evaluationId) {
-            currentEvaluation = currentCourse.evaluations.find(e => e.id === evaluationId);
+        function startEvaluation(evaluacionId) {
+            currentEvaluation = evaluations.find(e => e.id === evaluacionId);
             if (!currentEvaluation) return;
+
+            // **IMPORTANTE**: Aquí deberías llamar a un script PHP/API para registrar el inicio del intento
+            // y, si es necesario, obtener las respuestas guardadas si es una continuación.
 
             // Cambiar vista
             document.getElementById('evaluationsListView').classList.remove('active');
             document.getElementById('evaluationFormView').classList.add('active');
 
             // Configurar formulario
-            setupEvaluationForm();
+            setupEvaluationForm(evaluacionId);
             
             // Iniciar timer
-            startTimer();
+            startTimer(currentEvaluation.duration);
             
-            // Marcar como en progreso
+            // Marcar como en progreso (solo en el cliente, el backend lo haría al registrar el inicio)
             currentEvaluation.status = 'in-progress';
         }
 
-        function continueEvaluation(evaluationId) {
-            startEvaluation(evaluationId);
+        function continueEvaluation(evaluacionId) {
+            // En un sistema real, aquí harías una petición para obtener el tiempo restante 
+            // y las respuestas almacenadas en respuestas_evaluacion.Respuestas.
+            
+            // Por simplicidad de la demo, simplemente iniciamos la evaluación como si fuera nueva.
+            startEvaluation(evaluacionId);
         }
 
         function viewResults(evaluationId) {
-            const evaluation = currentCourse.evaluations.find(e => e.id === evaluationId);
+            const evaluation = evaluations.find(e => e.id === evaluationId);
             if (!evaluation) return;
 
-            alert(`📊 Resultados de: ${evaluation.title}\n\nCalificación: ${evaluation.score}/${evaluation.points} puntos\nEstado: Completada el ${formatDate(evaluation.completedDate)}\n\nEn una implementación real, esto mostraría un reporte detallado de la evaluación.`);
+            // En un sistema real, cargarías los resultados detallados desde la BD
+            alert(`📊 Resultados de: ${evaluation.title}\n\nCalificación: ${Math.round(evaluation.score)}/${evaluation.points} puntos\nEstado: Completada el ${formatDate(evaluation.completedDate)}\n\n(En una implementación real, esto mostraría un reporte detallado de la evaluación.)`);
         }
 
         // === CONFIGURAR FORMULARIO ===
-        function setupEvaluationForm() {
-            if (!currentEvaluation) return;
+        function setupEvaluationForm(evaluationId) {
+            const fullEvaluationData = questionsData[evaluationId];
 
+            if (!fullEvaluationData) {
+                alert('Error: No se encontraron preguntas para esta evaluación.');
+                returnToList();
+                return;
+            }
+
+            // Establecer ID de evaluación en el formulario
+            document.getElementById('formEvaluationId').value = evaluationId;
             document.getElementById('formTitle').textContent = currentEvaluation.title;
             document.getElementById('formDescription').textContent = currentEvaluation.description;
 
@@ -1276,38 +1303,42 @@
 
             // Mostrar sección de archivo si es necesaria
             const fileUploadSection = document.getElementById('fileUploadSection');
-            if (currentEvaluation.requiresFile) {
+            if (fullEvaluationData.requiresFile) {
                 fileUploadSection.style.display = 'block';
             } else {
                 fileUploadSection.style.display = 'none';
             }
 
             // Generar preguntas
-            generateQuestions();
+            generateQuestions(fullEvaluationData.questionsList);
         }
 
         // === GENERAR PREGUNTAS ===
-        function generateQuestions() {
+        function generateQuestions(questions) {
             const container = document.getElementById('questionsContainer');
-            const questions = currentEvaluation.questionsList;
-
+            
             container.innerHTML = questions.map((question, index) => {
+                const questionNumber = index + 1;
+                
                 if (question.type === 'multiple-choice') {
+                    // El campo 'options' viene como array de PHP, no necesitamos parsear aquí
+                    const options = Array.isArray(question.options) ? question.options : []; 
+                    
                     return `
                         <div class="question-container">
                             <div class="question-header">
-                                <div class="question-number">${index + 1}</div>
+                                <div class="question-number">${questionNumber}</div>
                                 <div class="question-content">
                                     <div class="question-title">
-                                        Pregunta ${index + 1}
+                                        Pregunta ${questionNumber}
                                         <span class="question-type">Opción Múltiple</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="question-text">${question.question}</div>
-                            <div class="answer-options">
-                                ${question.options.map((option, optionIndex) => `
-                                    <div class="option-item" onclick="selectOption(${question.id}, ${optionIndex})">
+                            <div class="answer-options" data-question-id="${question.id}">
+                                ${options.map((option, optionIndex) => `
+                                    <div class="option-item" onclick="selectOption(${question.id}, ${optionIndex}, this)">
                                         <div class="option-radio" id="radio-${question.id}-${optionIndex}"></div>
                                         <span>${option}</span>
                                     </div>
@@ -1319,10 +1350,10 @@
                     return `
                         <div class="question-container">
                             <div class="question-header">
-                                <div class="question-number">${index + 1}</div>
+                                <div class="question-number">${questionNumber}</div>
                                 <div class="question-content">
                                     <div class="question-title">
-                                        Pregunta ${index + 1}
+                                        Pregunta ${questionNumber}
                                         <span class="question-type">Respuesta Abierta</span>
                                     </div>
                                 </div>
@@ -1341,17 +1372,18 @@
         }
 
         // === MANEJAR RESPUESTAS ===
-        function selectOption(questionId, optionIndex) {
-            // Limpiar selecciones anteriores
-            document.querySelectorAll(`[id^="radio-${questionId}-"]`).forEach(radio => {
-                radio.classList.remove('selected');
-                radio.parentElement.classList.remove('selected');
+        function selectOption(questionId, optionIndex, clickedElement) {
+            const optionsContainer = clickedElement.closest('.answer-options');
+            
+            // Limpiar selecciones visuales anteriores en este grupo
+            optionsContainer.querySelectorAll('.option-item').forEach(item => {
+                item.classList.remove('selected');
+                item.querySelector('.option-radio').classList.remove('selected');
             });
 
-            // Seleccionar nueva opción
-            const selectedRadio = document.getElementById(`radio-${questionId}-${optionIndex}`);
-            selectedRadio.classList.add('selected');
-            selectedRadio.parentElement.classList.add('selected');
+            // Aplicar selección visual a la nueva opción
+            clickedElement.classList.add('selected');
+            clickedElement.querySelector('.option-radio').classList.add('selected');
 
             // Guardar respuesta
             userAnswers[questionId] = optionIndex;
@@ -1362,12 +1394,17 @@
         }
 
         // === TIMER ===
-        function startTimer() {
+        function startTimer(durationMinutes) {
+            if (evaluationTimer) clearInterval(evaluationTimer);
+            timeRemaining = durationMinutes * 60; // Iniciar tiempo
+            document.getElementById('timerDisplay').classList.remove('warning');
+            updateTimerDisplay();
+            
             evaluationTimer = setInterval(() => {
                 timeRemaining--;
                 updateTimerDisplay();
 
-                if (timeRemaining <= 300) { // 5 minutos restantes
+                if (timeRemaining <= 300 && timeRemaining > 0) { // 5 minutos restantes
                     document.getElementById('timerDisplay').classList.add('warning');
                 }
 
@@ -1386,22 +1423,33 @@
         }
 
         function autoSubmitEvaluation() {
+            // **IMPORTANTE**: En un sistema real, aquí llamarías a la función de envío de respuestas 
+            // de forma silenciosa.
             alert('⏰ El tiempo ha terminado. La evaluación se entregará automáticamente.');
-            submitEvaluation();
+            
+            // Forzamos el envío para la simulación
+            confirmSubmission(true); 
         }
 
         // === MANEJO DE ARCHIVOS ===
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if (!file) return;
+            if (!file) {
+                 document.getElementById('selectedFile').classList.remove('show');
+                 return;
+            }
             
             if (file.size > 10 * 1024 * 1024) {
                 alert('El archivo es demasiado grande. Máximo 10MB permitido.');
+                document.getElementById('fileInput').value = '';
+                document.getElementById('selectedFile').classList.remove('show');
                 return;
             }
             
             if (file.type !== 'application/pdf') {
                 alert('Solo se permiten archivos PDF.');
+                document.getElementById('fileInput').value = '';
+                document.getElementById('selectedFile').classList.remove('show');
                 return;
             }
             
@@ -1410,14 +1458,20 @@
             document.getElementById('selectedFile').classList.add('show');
         }
 
-        // === ENVÍO DE EVALUACIÓN ===
+        // === ENVÍO DE EVALUACIÓN (Simulación de pre-envío) ===
         function submitEvaluation() {
-            // Validar respuestas
-            const totalQuestions = currentEvaluation.questionsList.length;
+            // Detener timer mientras se revisa
+            if (evaluationTimer) clearInterval(evaluationTimer);
+
+            const evaluationId = document.getElementById('formEvaluationId').value;
+            const fullEvaluationData = questionsData[evaluationId];
+            const totalQuestions = fullEvaluationData.questionsList.length;
             const answeredQuestions = Object.keys(userAnswers).length;
 
             if (answeredQuestions < totalQuestions) {
                 if (!confirm(`Has respondido ${answeredQuestions} de ${totalQuestions} preguntas. ¿Deseas entregar la evaluación de todas formas?`)) {
+                    // Si el usuario cancela, reanudar el timer
+                    startTimer(Math.ceil(timeRemaining / 60)); 
                     return;
                 }
             }
@@ -1430,7 +1484,9 @@
             const modal = document.getElementById('submissionModal');
             const summary = document.getElementById('submissionSummary');
 
-            const totalQuestions = currentEvaluation.questionsList.length;
+            const evaluationId = document.getElementById('formEvaluationId').value;
+            const fullEvaluationData = questionsData[evaluationId];
+            const totalQuestions = fullEvaluationData.questionsList.length;
             const answeredQuestions = Object.keys(userAnswers).length;
             const timeUsed = (currentEvaluation.duration * 60) - timeRemaining;
             const timeUsedMinutes = Math.floor(timeUsed / 60);
@@ -1462,87 +1518,148 @@
             `;
 
             modal.classList.add('active');
+            
+            // Ocultar mensaje de éxito en caso de reintento
+            document.getElementById('successMessage').classList.remove('show');
+            document.querySelector('.submission-summary').style.display = 'block';
+            document.querySelector('.modal-actions').style.display = 'flex';
+            document.querySelector('.submission-modal p').style.display = 'block';
         }
 
-        function confirmSubmission() {
-            // Detener timer
-            if (evaluationTimer) {
-                clearInterval(evaluationTimer);
-            }
+        // === CONFIRMAR ENVÍO Y COMUNICARSE CON EL BACKEND ===
+async function confirmSubmission(isAutoSubmission = false) {
+    // Detener timer
+    if (evaluationTimer) clearInterval(evaluationTimer);
 
-            // Simular calificación automática (solo para demo)
-            const score = calculateScore();
-            
-            // Actualizar evaluación
-            currentEvaluation.status = 'completed';
-            currentEvaluation.completedDate = new Date().toISOString().split('T')[0];
-            currentEvaluation.score = score;
+    const evaluationId = document.getElementById('formEvaluationId').value;
 
-            // Mostrar mensaje de éxito
-            document.getElementById('submissionSummary').style.display = 'none';
-            document.querySelector('.modal-actions').style.display = 'none';
-            document.querySelector('.submission-modal p').style.display = 'none';
-            document.getElementById('successMessage').classList.add('show');
+    // Estructura de datos que se enviará en el cuerpo JSON
+    const payload = {
+        evaluation_id: evaluationId,
+        student_id: studentId,
+        answers: userAnswers, // Objeto de respuestas
+        time_remaining: timeRemaining,
+        // Eliminamos el manejo de archivos de este payload JSON
+    };
+
+        
+    try {
+    // Muestra mensaje de envío
+    document.querySelector('.modal-actions').innerHTML = '<span>⏳ Enviando...</span>';
+
+    // 1. Enviar datos al script PHP (usando la estructura JSON ya configurada)
+    const response = await fetch('submit_evaluation.php', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(payload) // 'payload' ya contiene los datos de la evaluación
+    });
+
+    // ⚠️ CAMBIO CLAVE: Leer la respuesta como texto para capturar errores de PHP
+    const responseText = await response.text();
+    
+    // Si el código de estado no es de éxito (ej. 500, 400), muestra el error completo
+    if (!response.ok) {
+        // Log del error de PHP o texto inesperado
+        console.error("--- ERROR RAW RESPONSE (PHP OUTPUT) ---");
+        console.error(responseText);
+        console.error("---------------------------------------");
+        
+        // Intenta parsear el error para un mejor mensaje, si es JSON
+        try {
+            const result = JSON.parse(responseText);
+            throw new Error(result.message || 'Error del servidor sin mensaje específico.');
+        } catch {
+            // Si falla al parsear (porque es HTML/texto puro), muestra el inicio del error
+            const cleanText = responseText.substring(0, 200).replace(/<[^>]*>/g, '').trim();
+            throw new Error(`El servidor devolvió un error HTTP ${response.status}. La respuesta no fue JSON. Contenido inicial: "${cleanText}..."`);
+        }
+    }
+    
+    // Si response.ok es true (código 200-299), asume que es JSON válido
+    const result = JSON.parse(responseText);
+
+
+    if (!result.success) {
+        throw new Error(result.message || 'Error desconocido al enviar.');
+    }
+
+        // 2. Actualización de datos en el cliente (resto del código de éxito...)
+        
+        const localEvalIndex = evaluations.findIndex(e => e.id == evaluationId);
+        if (localEvalIndex !== -1) {
+            evaluations[localEvalIndex].status = result.status === 'calificada' ? 'completed' : 'grading';
+            evaluations[localEvalIndex].completedDate = new Date().toISOString().split('T')[0];
+            evaluations[localEvalIndex].score = result.calificacion;
         }
 
-        function calculateScore() {
-            // Simulación simple de calificación
-            let correctAnswers = 0;
-            const multipleChoiceQuestions = currentEvaluation.questionsList.filter(q => q.type === 'multiple-choice');
-            
-            multipleChoiceQuestions.forEach(question => {
-                if (userAnswers[question.id] === question.correctAnswer) {
-                    correctAnswers++;
-                }
-            });
+        // 3. Mostrar mensaje de éxito
+        document.querySelector('.submission-summary').style.display = 'none';
+        document.querySelector('.submission-modal p').style.display = 'none';
+        document.getElementById('successMessage').classList.add('show');
+        
+        // Limpiar acciones
+        document.querySelector('.modal-actions').style.display = 'none';
 
-            // Calcular puntuación basada en respuestas correctas de opción múltiple
-            // Las preguntas abiertas se califican manualmente (simulamos puntuación parcial)
-            const multipleChoiceScore = (correctAnswers / multipleChoiceQuestions.length) * 0.7; // 70% del puntaje
-            const openEndedScore = 0.25; // Simulamos 25% adicional por preguntas abiertas
-            
-            return Math.round((multipleChoiceScore + openEndedScore) * currentEvaluation.points);
+    } catch (error) {
+        alert(`❌ Error al enviar la evaluación: ${error.message}`);
+        if (!isAutoSubmission) {
+            startTimer(Math.ceil(timeRemaining / 60));
         }
-
+        document.querySelector('.modal-actions').innerHTML = `
+            <button class="cancel-btn" onclick="closeSubmissionModal()">Revisar</button>
+            <button class="confirm-btn" onclick="confirmSubmission()">Reintentar Envío</button>
+        `;
+    }
+}
+        
         // === FUNCIONES DE MODAL ===
         function closeSubmissionModal() {
             document.getElementById('submissionModal').classList.remove('active');
+            
+            // Si el modal se cierra después de un envío fallido o para revisar respuestas, 
+            // el timer debe reanudarse (solo si no se está mostrando el mensaje de éxito)
+            if (!document.getElementById('successMessage').classList.contains('show')) {
+                startTimer(Math.ceil(timeRemaining / 60));
+            }
         }
 
         function returnToList() {
             // Resetear formulario
             userAnswers = {};
             currentEvaluation = null;
+            document.getElementById('fileInput').value = '';
             
             // Cambiar vista
             document.getElementById('evaluationFormView').classList.remove('active');
             document.getElementById('evaluationsListView').classList.add('active');
             
-            // Cerrar modal
+            // Cerrar modal y limpiar
             closeSubmissionModal();
             
-            // Recargar lista
-            loadEvaluations();
+            // Recargar lista y header para reflejar el nuevo estado (ej: 'grading' o 'completed')
             loadCourseHeader();
+            loadEvaluations(); // Esto usa los datos 'evaluations' actualizados en confirmSubmission
             
-            // Resetear modal
-            document.getElementById('submissionSummary').style.display = 'block';
+            // Resetear modal a su estado inicial para la próxima vez
+            document.querySelector('.submission-summary').style.display = 'block';
             document.querySelector('.modal-actions').style.display = 'flex';
             document.querySelector('.submission-modal p').style.display = 'block';
             document.getElementById('successMessage').classList.remove('show');
         }
 
         function cancelEvaluation() {
-            if (confirm('¿Estás seguro de que deseas cancelar la evaluación? Se perderá todo el progreso.')) {
+            if (confirm('¿Estás seguro de que deseas cancelar la evaluación? Se perderá el progreso no guardado.')) {
                 if (evaluationTimer) {
                     clearInterval(evaluationTimer);
                 }
                 
-                // Resetear estado si estaba en progreso
-                if (currentEvaluation && currentEvaluation.status === 'in-progress') {
-                    currentEvaluation.status = 'pending';
-                }
+                // **IMPORTANTE**: Si el estado era 'in-progress' en la BD, se debería
+                // actualizar el campo 'FechaEntrega' a NULL y 'Estado' a 'en_progreso' 
+                // para permitir la continuación. 
                 
+                // En esta simulación, simplemente regresamos a la lista.
                 returnToList();
             }
         }
@@ -1556,13 +1673,17 @@
 
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') {
-                    closeSubmissionModal();
+                    // Solo cerrar el modal si está activo
+                    if (document.getElementById('submissionModal').classList.contains('active')) {
+                        closeSubmissionModal();
+                    }
                 }
             });
-
+            
+            // Prevenir pérdida de foco si el modal de confirmación está abierto
             document.getElementById('submissionModal').addEventListener('click', function(e) {
                 if (e.target === this) {
-                    closeSubmissionModal();
+                    // No hacer nada si se hace clic fuera, deja que el usuario decida en el modal
                 }
             });
         }
@@ -1577,20 +1698,6 @@
             };
             return date.toLocaleDateString('es-ES', options);
         }
-
-        function showError(message) {
-            document.getElementById('courseName').textContent = 'Error';
-            document.getElementById('evaluationsGrid').innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: #4a5568;">
-                    <div style="font-size: 4rem; margin-bottom: 1rem;">❌</div>
-                    <h3>${message}</h3>
-                    <p>Por favor, regresa a tus cursos e intenta nuevamente.</p>
-                    <a href="my-courses.html" style="display: inline-block; margin-top: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 2rem; border-radius: 10px; text-decoration: none; font-weight: 600;">
-                        ← Volver a Mis Cursos
-                    </a>
-                </div>
-            `;
-        }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98c31ff5d3416b95',t:'MTc2MDA2NzkyNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>

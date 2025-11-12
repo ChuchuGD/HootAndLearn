@@ -1,269 +1,729 @@
 <?php
 session_start();
-require_once __DIR__ . '/conexion.php';
 
-// API: manejar inscripción vía JSON POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // aceptar JSON o form
-    $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-    if (!isset($input['action']) || $input['action'] !== 'enroll') {
-        header('Content-Type: application/json; charset=utf-8', true, 400);
-        echo json_encode(['success' => false, 'message' => 'Acción inválida']);
-        exit;
-    }
+// Verificar autenticación
+if (!isset($_SESSION['student_logged_in']) || $_SESSION['student_logged_in'] !== true) {
+    header("Location: student-portal.php");
+    exit();
+}
 
-    $courseId = isset($input['courseId']) ? (int)$input['courseId'] : 0;
-    $studentId = isset($_SESSION['student_id']) ? (int)$_SESSION['student_id'] : 0;
+// Configuración de la base de datos
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "hootlearn";
 
-    if ($courseId <= 0) {
-        header('Content-Type: application/json; charset=utf-8', true, 400);
-        echo json_encode(['success' => false, 'message' => 'Curso inválido']);
-        exit;
-    }
+// Crear conexión
+$conn = new mysqli($servername, $username, $password, $dbname);
 
-    // Si no hay sesión: crear/reusar cuenta "guest" por sesión (no global)
-    if ($studentId <= 0) {
-        // usar session_id() para crear un guest único por navegador/sesión
-        if (session_id() === '') session_start();
-        $guestEmail = 'guest_' . session_id() . '@hootlearn.local';
-        $gstmt = $conn->prepare("SELECT IDEst FROM EstudianteRegistro WHERE EstCorreo = ? LIMIT 1");
-        if ($gstmt) {
-            $gstmt->bind_param("s", $guestEmail);
-            $gstmt->execute();
-            $gres = $gstmt->get_result();
-            if ($grow = $gres->fetch_assoc()) {
-                $studentId = (int)$grow['IDEst'];
-            }
-            $gstmt->close();
-        }
-        if ($studentId <= 0) {
-            // crear cuenta guest mínima con email único por sesión
-            $insertGuest = $conn->prepare("INSERT INTO EstudianteRegistro (EstNombre, EstCorreo, EstPassword) VALUES (?, ?, ?)");
-            $guestName = 'Invitado';
-            $guestPass = ''; // en producción usar hash
-            if ($insertGuest) {
-                $insertGuest->bind_param("sss", $guestName, $guestEmail, $guestPass);
-                $insertGuest->execute();
-                $studentId = (int)$conn->insert_id;
-                $insertGuest->close();
-            }
-        }
-    }
-    // setear sesión para que "mis-cursos.php" muestre los cursos inmediatamente
-    $_SESSION['student_id'] = $studentId;
-    // opcional: cargar y guardar nombre del estudiante
-    $sn = $conn->prepare("SELECT EstNombre FROM EstudianteRegistro WHERE IDEst = ? LIMIT 1");
-    if ($sn) {
-        $sn->bind_param("i", $studentId);
-        $sn->execute();
-        $sres = $sn->get_result();
-        if ($srow = $sres->fetch_assoc()) $_SESSION['student_name'] = $srow['EstNombre'] ?? 'Invitado';
-        $sn->close();
-    }
+// Verificar conexión
+if ($conn->connect_error) {
+    die("Error de conexión: " . $conn->connect_error);
+}
 
-    // Intentar insertar inscripción (maneja duplicados)
-    $conn->begin_transaction();
-    try {
-        $ins = $conn->prepare("INSERT INTO inscripciones (IDEst, curso_id, fecha_inscripcion, created_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
-        $ins->bind_param("ii", $studentId, $courseId);
-        $insResult = $ins->execute();
-        if ($ins === false) {
-            throw new Exception($conn->error);
-        }
-        $ins->close();
+$conn->set_charset("utf8mb4");
 
-        if ($insResult === false) {
-            // si duplicate entry -> ya inscrito
-            if ($conn->errno === 1062) {
-                $already = true;
-            } else {
-                throw new Exception($conn->error);
-            }
+// Obtener datos del estudiante
+$studentName = $_SESSION['student_name'];
+$studentEmail = $_SESSION['student_email'];
+$studentId = $_SESSION['student_id'];
+
+// Variables para mensajes
+$mensaje = "";
+$tipo_mensaje = "";
+
+// ============================================
+// PROCESAR INSCRIPCIÓN A CURSO
+// ============================================
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['enroll_course'])) {
+    $cursoId = intval($_POST['curso_id']);
+    $estId = $studentId;
+    
+    // Verificar si el estudiante ya está inscrito
+    $check_stmt = $conn->prepare("SELECT InscripcionID FROM inscripciones WHERE EstID = ? AND CursoID = ?");
+    $check_stmt->bind_param("ii", $estId, $cursoId);
+    $check_stmt->execute();
+    $result = $check_stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $mensaje = "Ya estás inscrito en este curso";
+        $tipo_mensaje = "warning";
+    } else {
+        // Inscribir al estudiante
+        $inscripcion_stmt = $conn->prepare("INSERT INTO inscripciones (EstID, CursoID, FechaInscripcion, Progreso, Estado) VALUES (?, ?, NOW(), 0, 'activo')");
+        $inscripcion_stmt->bind_param("ii", $estId, $cursoId);
+        
+        if ($inscripcion_stmt->execute()) {
+            $mensaje = "¡Inscripción exitosa! Ya puedes acceder al curso.";
+            $tipo_mensaje = "success";
+            
+            // Crear notificación
+            $notif_titulo = "Inscripción exitosa";
+            $notif_mensaje = "Te has inscrito exitosamente al curso";
+            $tipo_usuario = "estudiante";
+            
+            $notif_stmt = $conn->prepare("INSERT INTO notificaciones (UsuarioID, TipoUsuario, Titulo, Mensaje, Tipo) VALUES (?, ?, ?, ?, 'success')");
+            $notif_stmt->bind_param("isss", $estId, $tipo_usuario, $notif_titulo, $notif_mensaje);
+            $notif_stmt->execute();
+            $notif_stmt->close();
         } else {
-            $already = false;
+            $mensaje = "Error al inscribirse: " . $inscripcion_stmt->error;
+            $tipo_mensaje = "error";
         }
-
-        // Asegurar fila en progreso_estudiante (inserta o actualiza total_lecciones)
-        $q = $conn->prepare("SELECT Lecciones FROM cursos WHERE IDCurso = ?");
-        $q->bind_param("i", $courseId);
-        $q->execute();
-        $res = $q->get_result();
-        $totalLessons = 0;
-        if ($r = $res->fetch_assoc()) $totalLessons = (int)$r['Lecciones'];
-        $q->close();
-
-        $p = $conn->prepare("
-            INSERT INTO progreso_estudiante (estudiante_id, curso_id, lecciones_completas, total_lecciones)
-            VALUES (?, ?, 0, ?)
-            ON DUPLICATE KEY UPDATE total_lecciones = VALUES(total_lecciones)
-        ");
-        $p->bind_param("iii", $studentId, $courseId, $totalLessons);
-        $p->execute();
-        $p->close();
-
-        $conn->commit();
-
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => true, 'already_enrolled' => $already, 'message' => $already ? 'Ya inscrito' : 'Inscripción exitosa', 'studentId' => $studentId]);
-        exit;
-
-    } catch (Exception $e) {
-        $conn->rollback();
-        header('Content-Type: application/json; charset=utf-8', true, 500);
-        echo json_encode(['success' => false, 'message' => 'Error en el servidor', 'error' => $e->getMessage()]);
-        exit;
+        $inscripcion_stmt->close();
     }
+    $check_stmt->close();
 }
 
-// Si no es POST: cargar lista de cursos desde DB para mostrar en la UI
-$courses = [];
-$stmt = $conn->prepare("SELECT IDCurso AS id, Titulo AS title, Instructor AS instructor, Icono AS icon, Lecciones AS lessons, descripcion FROM cursos ORDER BY created_at DESC");
-if ($stmt) {
-    $stmt->execute();
-    $res = $stmt->get_result();
-    while ($row = $res->fetch_assoc()) {
-        $courses[] = $row;
-    }
-    $stmt->close();
+// ============================================
+// OBTENER CURSOS DISPONIBLES
+// ============================================
+$filtro_categoria = isset($_GET['categoria']) ? $_GET['categoria'] : '';
+$filtro_precio = isset($_GET['precio']) ? floatval($_GET['precio']) : 0;
+$filtro_busqueda = isset($_GET['busqueda']) ? trim($_GET['busqueda']) : '';
+
+// Construir query con filtros
+$query = "SELECT 
+            c.CursoID,
+            c.NombreCurso,
+            c.Descripcion,
+            c.Icono,
+            c.Precio,
+            c.Duracion,
+            c.TotalLecciones,
+            CONCAT(p.ProfNombre, ' ', p.ProfApellido) AS Instructor,
+            COUNT(DISTINCT i.EstID) AS TotalEstudiantes,
+            CASE 
+                WHEN ie.InscripcionID IS NOT NULL THEN 1 
+                ELSE 0 
+            END AS YaInscrito
+          FROM cursos c
+          LEFT JOIN profesorregistro p ON c.ProfID = p.ProfID
+          LEFT JOIN inscripciones i ON c.CursoID = i.CursoID
+          LEFT JOIN inscripciones ie ON c.CursoID = ie.CursoID AND ie.EstID = ?
+          WHERE c.Activo = TRUE";
+
+$params = array($studentId);
+$types = "i";
+
+if (!empty($filtro_busqueda)) {
+    $query .= " AND (c.NombreCurso LIKE ? OR c.Descripcion LIKE ?)";
+    $busqueda_param = "%{$filtro_busqueda}%";
+    $params[] = $busqueda_param;
+    $params[] = $busqueda_param;
+    $types .= "ss";
 }
 
-// Obtener cursos en los que ya está inscrito el usuario real o el guest (para deshabilitar botón)
-$enrolledCourseIds = [];
-$checkStudentId = isset($_SESSION['student_id']) ? (int)$_SESSION['student_id'] : 0;
-if ($checkStudentId <= 0) {
-    // intentar usar guest si existe
-    $guestEmail = 'guest@hootlearn.local';
-    $gstmt = $conn->prepare("SELECT IDEst FROM EstudianteRegistro WHERE EstCorreo = ? LIMIT 1");
-    if ($gstmt) {
-        $gstmt->bind_param("s", $guestEmail);
-        $gstmt->execute();
-        $gres = $gstmt->get_result();
-        if ($grow = $gres->fetch_assoc()) $checkStudentId = (int)$grow['IDEst'];
-        $gstmt->close();
-    }
+if (!empty($filtro_categoria)) {
+    $query .= " AND c.Categoria = ?";
+    $params[] = $filtro_categoria;
+    $types .= "s";
 }
-if ($checkStudentId > 0) {
-    $eStmt = $conn->prepare("SELECT curso_id FROM inscripciones WHERE IDEst = ?");
-    if ($eStmt) {
-        $eStmt->bind_param("i", $checkStudentId);
-        $eStmt->execute();
-        $eRes = $eStmt->get_result();
-        while ($er = $eRes->fetch_assoc()) {
-            $enrolledCourseIds[] = (int)$er['curso_id'];
+
+if ($filtro_precio > 0) {
+    $query .= " AND c.Precio <= ?";
+    $params[] = $filtro_precio;
+    $types .= "d";
+}
+
+$query .= " GROUP BY c.CursoID ORDER BY c.FechaCreacion DESC";
+
+$stmt = $conn->prepare($query);
+if ($stmt === false) {
+    die("Error preparando consulta: " . $conn->error);
+}
+
+// Bind dinámico de parámetros
+$bind_params = array($types);
+for ($i = 0; $i < count($params); $i++) {
+    $bind_params[] = &$params[$i];
+}
+call_user_func_array(array($stmt, 'bind_param'), $bind_params);
+
+$stmt->execute();
+$cursos_result = $stmt->get_result();
+$cursos_disponibles = array();
+
+while ($row = $cursos_result->fetch_assoc()) {
+    $cursos_disponibles[] = $row;
+}
+$stmt->close();
+
+// ============================================
+// OBTENER CATEGORÍAS DISPONIBLES
+// ============================================
+// ============================================
+// OBTENER CATEGORÍAS DISPONIBLES
+// ============================================
+$categorias = array();
+$categorias_query = "SELECT DISTINCT Categoria FROM cursos WHERE Activo = TRUE AND Categoria IS NOT NULL AND Categoria != '' ORDER BY Categoria";
+$categorias_result = $conn->query($categorias_query);
+
+if ($categorias_result === false) {
+    // Si falla, usar categorías por defecto
+    error_log("Error en query de categorías: " . $conn->error);
+    $categorias = array('Programación', 'Diseño', 'Marketing', 'Idiomas', 'Negocios');
+} else {
+    while ($cat = $categorias_result->fetch_assoc()) {
+        if (!empty($cat['Categoria'])) {
+            $categorias[] = $cat['Categoria'];
         }
-        $eStmt->close();
+    }
+    
+    // Si no hay categorías en la BD, usar por defecto
+    if (empty($categorias)) {
+        $categorias = array('Programación', 'Diseño', 'Marketing', 'Idiomas', 'Negocios');
     }
 }
 
-$studentName = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : null;
-$studentId = isset($_SESSION['student_id']) ? (int)$_SESSION['student_id'] : 0;
-
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inscribirse a Cursos - Hoot & Learn</title>
     <style>
-        /* Mantener estilos existentes, simplificados */
-        body{font-family:Inter,Segoe UI,Roboto,sans-serif;background:#f7fafc;color:#2d3748;margin:0;padding:0}
-        .header{padding:1.5rem 2rem;background:rgba(255,255,255,0.2);backdrop-filter:blur(10px);border-bottom:1px solid rgba(0,0,0,0.03)}
-        .header .logo{font-weight:800}
-        .main{max-width:1200px;margin:2rem auto;padding:0 1rem}
-        .courses-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem}
-        .card{background:white;border-radius:12px;padding:1.5rem;box-shadow:0 6px 18px rgba(15,23,42,0.06);border:1px solid rgba(0,0,0,0.03)}
-        .card .title{font-weight:700;margin-bottom:0.5rem}
-        .card .meta{color:#4a5568;font-size:0.9rem;margin-bottom:1rem}
-        .enroll{display:inline-block;padding:0.8rem 1rem;border-radius:10px;background:linear-gradient(135deg,#5a67d8,#667eea);color:#fff;border:none;cursor:pointer}
-        .enroll[disabled]{opacity:0.6;cursor:default}
-        .login-cta{background:#fff;border:1px solid #e2e8f0;padding:0.6rem 0.9rem;border-radius:8px;color:#2d3748;text-decoration:none}
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f7fafc;
+            color: #2d3748;
+            min-height: 100%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        /* === FONDO ANIMADO === */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 25%, #a0aec0 50%, #718096 75%, #4a5568 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            z-index: -1;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* === HEADER === */
+        .header {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(20px);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .back-btn {
+            position: fixed;
+            bottom: 2rem;
+            left: 2rem;
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(10px);
+            color: #2d3748;
+            border: 1px solid rgba(255,255,255,0.9);
+            padding: 1rem;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            height: 50px;
+            z-index: 1000;
+            font-size: 1.2rem;
+        }
+
+        .back-btn:hover {
+            background: rgba(255,255,255,0.95);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(45,55,72,0.2);
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 3rem;
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 50%, #5a67d8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* === MENSAJES === */
+        .message {
+            max-width: 1200px;
+            margin: 0 auto 2rem auto;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.3);
+            color: #16a34a;
+        }
+
+        .message.error {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.3);
+            color: #dc2626;
+        }
+
+        .message.warning {
+            background: rgba(245,158,11,0.1);
+            border: 1px solid rgba(245,158,11,0.3);
+            color: #d97706;
+        }
+
+        /* === FILTROS === */
+        .filters-section {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 8px 32px rgba(45,55,72,0.1);
+        }
+
+        .filters-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #2d3748;
+        }
+
+        .filters-form {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+
+        .filter-input, .filter-select {
+            padding: 0.8rem 1rem;
+            border: 1px solid rgba(45,55,72,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.9);
+            font-size: 1rem;
+            color: #2d3748;
+            transition: all 0.3s ease;
+        }
+
+        .filter-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: #5a67d8;
+            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.1);
+        }
+
+        .filter-btn {
+            background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(90,103,216,0.3);
+        }
+
+        /* === CURSOS === */
+        .courses-section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: #2d3748;
+        }
+
+        .courses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .course-card {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.9);
+            transition: all 0.4s ease;
+            box-shadow: 0 8px 32px rgba(45,55,72,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .course-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #5a67d8, #667eea);
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+        }
+
+        .course-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .course-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(45,55,72,0.2);
+            background: rgba(255,255,255,0.95);
+        }
+
+        .course-card.enrolled {
+            border: 2px solid rgba(34,197,94,0.3);
+            background: rgba(34,197,94,0.05);
+        }
+
+        .course-card.enrolled::before {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            transform: scaleX(1);
+        }
+
+        .enrolled-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .course-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .course-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #2d3748;
+        }
+
+        .course-instructor {
+            font-size: 0.9rem;
+            color: #5a67d8;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .course-description {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .course-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .course-price {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #5a67d8;
+        }
+
+        .course-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            font-size: 0.85rem;
+            color: #718096;
+        }
+
+        .course-duration, .course-students {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .enroll-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(90, 103, 216, 0.2);
+        }
+
+        .enroll-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(90, 103, 216, 0.3);
+        }
+
+        .enroll-btn:disabled {
+            background: rgba(160,174,192,0.5);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .enroll-btn.enrolled {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        /* === NO RESULTS === */
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #4a5568;
+            font-size: 1.1rem;
+            background: rgba(255,255,255,0.8);
+            border-radius: 20px;
+        }
+
+        .no-results-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .filters-form {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .page-title {
+                font-size: 2rem;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- === FONDO ANIMADO === -->
+    <div class="animated-bg"></div>
+
+    <!-- === HEADER === -->
     <header class="header">
-        <div class="logo">Hoot & Learn</div>
+        <div class="header-content">
+            <div class="logo">Hoot & Learn</div>
+            <div class="welcome-text">Hola, <span><?php echo htmlspecialchars($studentName); ?></span>!</div>
+        </div>
     </header>
 
-    <main class="main">
-        <h1>Inscribirse a Cursos</h1>
-        <p>Explora los cursos disponibles e inscríbete. <?php if ($studentName) echo "Sesión: " . htmlspecialchars($studentName); ?></p>
+    <!-- === MAIN CONTENT === -->
+    <main class="main-content">
+        <h1 class="page-title">Inscribirse a Cursos</h1>
 
-        <div class="courses-grid" id="coursesGrid"></div>
+        <!-- === MENSAJE === -->
+        <?php if (!empty($mensaje)): ?>
+        <div class="message <?php echo $tipo_mensaje; ?> show">
+            <?php 
+            $icono = $tipo_mensaje === 'success' ? '✅' : ($tipo_mensaje === 'error' ? '❌' : '⚠️');
+            echo $icono . ' ' . htmlspecialchars($mensaje); 
+            ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- === FILTROS === -->
+        <section class="filters-section">
+            <h2 class="filters-title">🔍 Buscar y Filtrar Cursos</h2>
+            <form method="GET" action="" class="filters-form">
+                <div class="filter-group">
+                    <label class="filter-label">Buscar por nombre:</label>
+                    <input type="text" name="busqueda" class="filter-input" placeholder="Escribe el nombre del curso..." value="<?php echo htmlspecialchars($filtro_busqueda); ?>">
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Categoría:</label>
+                    <select name="categoria" class="filter-select">
+                        <option value="">Todas las categorías</option>
+                        <?php foreach ($categorias as $cat): ?>
+                            <option value="<?php echo htmlspecialchars($cat); ?>" <?php echo ($filtro_categoria === $cat) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($cat); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Precio máximo:</label>
+                    <select name="precio" class="filter-select">
+                        <option value="">Cualquier precio</option>
+                        <option value="50" <?php echo ($filtro_precio == 50) ? 'selected' : ''; ?>>Hasta $50</option>
+                        <option value="100" <?php echo ($filtro_precio == 100) ? 'selected' : ''; ?>>Hasta $100</option>
+                        <option value="200" <?php echo ($filtro_precio == 200) ? 'selected' : ''; ?>>Hasta $200</option>
+                        <option value="500" <?php echo ($filtro_precio == 500) ? 'selected' : ''; ?>>Hasta $500</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="filter-btn">🔍 Buscar</button>
+            </form>
+        </section>
+
+        <!-- === CURSOS DISPONIBLES === -->
+        <section class="courses-section">
+            <h2 class="section-title">📚 Cursos Disponibles</h2>
+            
+            <?php if (count($cursos_disponibles) > 0): ?>
+            <div class="courses-grid">
+                <?php foreach ($cursos_disponibles as $curso): ?>
+                <div class="course-card <?php echo $curso['YaInscrito'] ? 'enrolled' : ''; ?>">
+                    <?php if ($curso['YaInscrito']): ?>
+                    <div class="enrolled-badge">✓ Inscrito</div>
+                    <?php endif; ?>
+                    
+                    <div class="course-icon"><?php echo htmlspecialchars($curso['Icono']); ?></div>
+                    <h3 class="course-title"><?php echo htmlspecialchars($curso['NombreCurso']); ?></h3>
+                    <div class="course-instructor">👨‍🏫 <?php echo htmlspecialchars($curso['Instructor']); ?></div>
+                    <p class="course-description"><?php echo htmlspecialchars($curso['Descripcion']); ?></p>
+                    
+                    <div class="course-info">
+                        <div class="course-price">$<?php echo number_format($curso['Precio'], 2); ?></div>
+                        <div class="course-meta">
+                            <div class="course-duration">⏱️ <?php echo htmlspecialchars($curso['Duracion']); ?></div>
+                            <div class="course-students">👥 <?php echo $curso['TotalEstudiantes']; ?> estudiantes</div>
+                        </div>
+                    </div>
+                    
+                    <?php if ($curso['YaInscrito']): ?>
+                    <button class="enroll-btn enrolled" disabled>
+                        ✓ Ya estás inscrito
+                    </button>
+                    <?php else: ?>
+                    <form method="POST" action="" style="margin: 0;">
+                        <input type="hidden" name="curso_id" value="<?php echo $curso['CursoID']; ?>">
+                        <button type="submit" name="enroll_course" class="enroll-btn">
+                            📝 Inscribirse Ahora
+                        </button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php else: ?>
+            <div class="no-results">
+                <div class="no-results-icon">😕</div>
+                <h3>No se encontraron cursos</h3>
+                <p>No hay cursos que coincidan con tu búsqueda. Intenta con otros filtros.</p>
+            </div>
+            <?php endif; ?>
+        </section>
     </main>
 
+    <!-- === BOTÓN REGRESAR FLOTANTE === -->
+    <a href="student-dashboard.php" class="back-btn">←</a>
+
     <script>
-        const courses = <?php echo json_encode($courses, JSON_UNESCAPED_UNICODE); ?>;
-        // permitimos inscripción aun sin sesión => siempre mostramos botón
-        const enrolledCourseIds = <?php echo json_encode($enrolledCourseIds ?: [], JSON_UNESCAPED_UNICODE); ?>;
+        // Auto-ocultar mensajes después de 5 segundos
+        setTimeout(function() {
+            const messages = document.querySelectorAll('.message.show');
+            messages.forEach(function(msg) {
+                msg.style.opacity = '0';
+                msg.style.transition = 'opacity 0.5s';
+                setTimeout(function() {
+                    msg.remove();
+                }, 500);
+            });
+        }, 5000);
 
-        function render() {
-            const grid = document.getElementById('coursesGrid');
-            if (!courses.length) {
-                grid.innerHTML = '<div class="card">No hay cursos disponibles.</div>';
-                return;
-            }
-
-            grid.innerHTML = courses.map(c => {
-                const isEnrolled = enrolledCourseIds.includes(c.id);
-                return `
-                <div class="card" id="course-${c.id}">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-                        <div style="display:flex;gap:0.75rem;align-items:center">
-                            <div style="font-size:1.8rem">${escape(c.icon || '📚')}</div>
-                            <div>
-                                <div class="title">${escape(c.title)}</div>
-                                <div class="meta">${escape(c.instructor || '')}</div>
-                            </div>
-                        </div>
-                        <div style="text-align:right">
-                            <div style="font-weight:700;color:#5a67d8">${c.lessons} lecciones</div>
-                        </div>
-                    </div>
-                    <div style="color:#4a5568;margin-bottom:1rem">${escape(c.descripcion || '')}</div>
-                    <div style="display:flex;gap:0.75rem;align-items:center">
-                        ${isEnrolled ? `<button class="enroll" disabled>Ya inscrito</button>` : `<button class="enroll" onclick="enrollCourse(${c.id}, this)">Inscribirse</button>`}
-                        <a href="course-details.php?courseId=${c.id}" style="color:#5a67d8;text-decoration:none">Ver detalles</a>
-                    </div>
-                </div>
-                `;
-            }).join('');
-        }
-
-        async function enrollCourse(courseId, btn) {
-            btn.disabled = true;
-            btn.textContent = 'Inscribiendo...';
-
-            try {
-                const resp = await fetch('enroll-courses.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'enroll', courseId })
-                });
-                const data = await resp.json();
-                if (resp.ok && data.success) {
-                    btn.textContent = data.already_enrolled ? 'Ya inscrito' : 'Inscrito';
-                    btn.disabled = true;
-                    enrolledCourseIds.push(courseId);
-                    // redirigir para ver el curso en "Mis Cursos"
-                    window.location.href = 'mis-cursos.php';
-                } else {
-                    throw new Error(data.message || 'Error');
+        // Confirmación antes de inscribirse
+        const enrollForms = document.querySelectorAll('form[method="POST"]');
+        enrollForms.forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                const courseTitle = this.closest('.course-card').querySelector('.course-title').textContent;
+                const coursePrice = this.closest('.course-card').querySelector('.course-price').textContent;
+                
+                if (!confirm(`¿Deseas inscribirte al curso "${courseTitle}"?\n\nPrecio: ${coursePrice}`)) {
+                    e.preventDefault();
                 }
-            } catch (err) {
-                console.error(err);
-                alert('Error al inscribirse: ' + (err.message || 'comprueba la consola'));
-                btn.disabled = false;
-                btn.textContent = 'Inscribirse';
-            }
-        }
-
-        function escape(s) {
-            return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-        }
-
-        render();
+            });
+        });
     </script>
 </body>
 </html>
+<?php
+$conn->close();
+?>

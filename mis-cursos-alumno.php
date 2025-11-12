@@ -1,89 +1,125 @@
 <?php
 session_start();
-require_once __DIR__ . '/conexion.php';
 
-// NOTA: validación de sesión removida para permitir acceso directo.
-// Si no hay sesión activa, $studentId será 0 y no se consultarán cursos.
-$studentId = isset($_SESSION['student_id']) ? (int)$_SESSION['student_id'] : 0;
-$studentName = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : 'Estudiante';
-$courses = [];
+// Verificar autenticación
+if (!isset($_SESSION['student_logged_in']) || $_SESSION['student_logged_in'] !== true) {
+    header("Location: student-portal.php");
+    exit();
+}
 
-if ($studentId > 0) {
-    // Obtener cursos en los que está inscrito el estudiante (inscripciones.IDEst)
-    $stmt = $conn->prepare("
-        SELECT c.IDCurso AS id, c.Titulo AS title, COALESCE(c.Instructor, '') AS instructor,
-               COALESCE(c.Icono, '📚') AS icon, COALESCE(c.Lecciones, 0) AS lessons
-        FROM cursos c
-        JOIN inscripciones i ON i.curso_id = c.IDCurso
-        WHERE i.IDEst = ?
-    ");
-    if ($stmt) {
-        $stmt->bind_param("i", $studentId);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        while ($row = $res->fetch_assoc()) {
-            $courseId = (int)$row['id'];
+// Configuración de la base de datos
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "hootlearn";
 
-            // Progreso (si existe en progreso_estudiante)
-            $completed = 0;
-            $totalLessons = (int)$row['lessons'];
-            $progress = 0;
+// Crear conexión
+$conn = new mysqli($servername, $username, $password, $dbname);
 
-            $pstmt = $conn->prepare("SELECT lecciones_completas, total_lecciones FROM progreso_estudiante WHERE estudiante_id = ? AND curso_id = ?");
-            if ($pstmt) {
-                $pstmt->bind_param("ii", $studentId, $courseId);
-                $pstmt->execute();
-                $pres = $pstmt->get_result();
-                if ($prow = $pres->fetch_assoc()) {
-                    $completed = (int)$prow['lecciones_completas'];
-                    $totalLessons = (int)$prow['total_lecciones'] ?: $totalLessons;
-                    $progress = $totalLessons > 0 ? (int) round($completed / $totalLessons * 100) : 0;
-                }
-                $pstmt->close();
+// Verificar conexión
+if ($conn->connect_error) {
+    die("Error de conexión: " . $conn->connect_error);
+}
+
+$conn->set_charset("utf8mb4");
+
+// Obtener datos del estudiante
+$studentName = $_SESSION['student_name'];
+$studentEmail = $_SESSION['student_email'];
+$studentId = $_SESSION['student_id'];
+
+// ============================================
+// OBTENER CURSOS INSCRITOS DEL ESTUDIANTE
+// ============================================
+$cursos_query = "SELECT 
+    c.CursoID,
+    c.NombreCurso AS title,
+    c.Descripcion,
+    CONCAT(IFNULL(p.ProfNombre, ''), ' ', IFNULL(p.ProfApellido, '')) AS instructor,
+    IFNULL(c.Icono, '📚') AS icon,
+    IFNULL(c.TotalLecciones, 0) AS lessons,
+    IFNULL(i.Progreso, 0) AS progress,
+    IFNULL(i.LeccionesCompletadas, 0) AS completed,
+    i.FechaInscripcion,
+    i.Estado
+FROM inscripciones i
+INNER JOIN cursos c ON i.CursoID = c.CursoID
+LEFT JOIN profesorregistro p ON c.ProfID = p.ProfID
+WHERE i.EstID = ? AND c.Activo = TRUE
+ORDER BY i.FechaInscripcion DESC";
+
+$stmt = $conn->prepare($cursos_query);
+$courses = array();
+
+if ($stmt === false) {
+    error_log("Error preparando consulta de cursos: " . $conn->error);
+} else {
+    $stmt->bind_param("i", $studentId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    while ($row = $result->fetch_assoc()) {
+        $courseId = (int)$row['CursoID'];
+        
+        // Obtener actividades del curso
+        $activities = array();
+        $act_query = "SELECT 
+            a.ActividadID,
+            a.Titulo,
+            a.Tipo,
+            DATE_FORMAT(a.FechaVencimiento, '%Y-%m-%d') AS date,
+            CASE 
+                WHEN en.Estado = 'calificado' THEN 'completada'
+                WHEN en.EntregaID IS NOT NULL THEN 'en_progreso'
+                WHEN a.FechaVencimiento < CURDATE() THEN 'vencida'
+                ELSE 'pendiente'
+            END AS estado
+        FROM actividades a
+        LEFT JOIN entregas en ON a.ActividadID = en.ActividadID AND en.EstID = ?
+        WHERE a.CursoID = ? AND a.Activo = TRUE
+        ORDER BY a.FechaVencimiento ASC";
+        
+        $act_stmt = $conn->prepare($act_query);
+        if ($act_stmt !== false) {
+            $act_stmt->bind_param("ii", $studentId, $courseId);
+            $act_stmt->execute();
+            $act_result = $act_stmt->get_result();
+            
+            while ($act = $act_result->fetch_assoc()) {
+                $activities[] = array(
+                    'id' => (int)$act['ActividadID'],
+                    'date' => $act['date'],
+                    'title' => $act['Titulo'],
+                    'type' => $act['Tipo'],
+                    'estado' => $act['estado']
+                );
             }
-
-            // Actividades del curso
-            $activities = [];
-            $aStmt = $conn->prepare("SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS date, titulo, tipo FROM actividades WHERE curso_id = ? ORDER BY fecha");
-            if ($aStmt) {
-                $aStmt->bind_param("i", $courseId);
-                $aStmt->execute();
-                $aRes = $aStmt->get_result();
-                while ($ar = $aRes->fetch_assoc()) {
-                    $activities[] = [
-                        'date'  => $ar['date'],
-                        'title' => $ar['titulo'],
-                        'type'  => $ar['tipo']
-                    ];
-                }
-                $aStmt->close();
-            }
-
-            $courses[] = [
-                'id' => $courseId,
-                'title' => $row['title'],
-                'instructor' => $row['instructor'],
-                'icon' => $row['icon'],
-                'progress' => $progress,
-                'lessons' => $totalLessons,
-                'completed' => $completed,
-                'activities' => $activities
-            ];
+            $act_stmt->close();
         }
-        $stmt->close();
+        
+        $courses[] = array(
+            'id' => $courseId,
+            'title' => $row['title'],
+            'instructor' => $row['instructor'],
+            'icon' => $row['icon'],
+            'progress' => (int)$row['progress'],
+            'lessons' => (int)$row['lessons'],
+            'completed' => (int)$row['completed'],
+            'activities' => $activities
+        );
     }
+    $stmt->close();
 }
 
 $sampleCoursesJson = json_encode($courses, JSON_UNESCAPED_UNICODE);
 
-// Cerrar conexión
 $conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Cursos - Hoot & Learn</title>
     <style>
         body {
@@ -522,6 +558,18 @@ $conn->close();
             background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
         }
 
+        /* === EMPTY STATE === */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #4a5568;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
         /* === RESPONSIVE === */
         @media (max-width: 768px) {
             .main-layout {
@@ -546,25 +594,111 @@ $conn->close();
             }
         }
     </style>
+</head>
+<body>
+    <!-- === FONDO ANIMADO === -->
+    <div class="animated-bg"></div>
+
+    <!-- === HEADER === -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">Hoot & Learn</div>
+            <div class="nav-buttons">
+                <a href="student-dashboard.php" class="nav-btn">← Dashboard</a>
+                <a href="logout.php" class="nav-btn">Cerrar Sesión</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- === MAIN CONTENT === -->
+    <main class="main-content">
+        <!-- === BIENVENIDA === -->
+        <section class="welcome-section">
+            <h1 class="welcome-title">Gestionar Mis Cursos 📚</h1>
+            <p class="welcome-subtitle" id="welcomeMessage">
+                Bienvenido de vuelta, <?php echo htmlspecialchars($studentName); ?>
+            </p>
+        </section>
+
+        <!-- === LAYOUT PRINCIPAL === -->
+        <div class="main-layout">
+            <!-- === CURSOS === -->
+            <section class="courses-section">
+                <h2 class="section-title">
+                    <span>📖</span>
+                    Cursos Inscritos
+                </h2>
+                <div class="courses-grid" id="coursesGrid">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+            </section>
+
+            <!-- === CALENDARIO === -->
+            <section class="calendar-section">
+                <div class="calendar-header">
+                    <h2 class="section-title">
+                        <span>📅</span>
+                        <span id="currentMonth"></span>
+                    </h2>
+                    <div class="calendar-nav">
+                        <button class="calendar-nav-btn" onclick="previousMonth()">‹</button>
+                        <button class="calendar-nav-btn" onclick="nextMonth()">›</button>
+                    </div>
+                </div>
+                <div class="calendar-grid" id="calendarGrid">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+                <div class="activities-list" id="activitiesList">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- === MODAL CURSO === -->
+    <div class="course-modal" id="courseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalCourseTitle">Curso Seleccionado</h3>
+                <button class="close-btn" onclick="closeCourseModal()">×</button>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="action-btn" onclick="showActivities()">
+                    📝 Actividades
+                </button>
+                <button class="action-btn secondary" onclick="showEvaluations()">
+                    📊 Evaluaciones
+                </button>
+            </div>
+
+            <div class="calendar-section" style="padding: 0;">
+                <h4 class="section-title">
+                    <span>📅</span>
+                    Calendario del Curso
+                </h4>
+                <div class="calendar-grid" id="modalCalendarGrid">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+                <div class="activities-list" id="modalActivitiesList">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // === DATOS DINÁMICOS DESDE PHP ===
-        const sampleCourses = <?php echo $sampleCoursesJson ?: '[]'; ?>;
+        const sampleCourses = <?php echo $sampleCoursesJson; ?>;
         let currentDate = new Date();
         let selectedCourse = null;
         
         // === INICIALIZACIÓN ===
         document.addEventListener('DOMContentLoaded', function() {
-            loadUserData();
             loadCourses();
             loadCalendar();
             loadActivities();
         });
-
-        // === CARGAR DATOS DEL USUARIO ===
-        function loadUserData() {
-            const studentName = localStorage.getItem('studentName') || 'Estudiante';
-            document.getElementById('welcomeMessage').textContent = `Bienvenido de vuelta, ${studentName}`;
-        }
 
         // === CARGAR CURSOS ===
         function loadCourses() {
@@ -572,8 +706,8 @@ $conn->close();
             
             if (sampleCourses.length === 0) {
                 coursesGrid.innerHTML = `
-                    <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: #4a5568;">
-                        <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <div class="empty-icon">📚</div>
                         <h3>No tienes cursos inscritos</h3>
                         <p>¡Inscríbete a tu primer curso para comenzar a aprender!</p>
                         <a href="enroll-courses.php" style="display: inline-block; margin-top: 1rem; background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%); color: white; padding: 1rem 2rem; border-radius: 10px; text-decoration: none; font-weight: 600;">
@@ -604,7 +738,7 @@ $conn->close();
                     </div>
                     <div class="course-stats">
                         <span>${course.completed}/${course.lessons} lecciones</span>
-                        <span>${course.activities.length} pendientes</span>
+                        <span>${course.activities.filter(a => a.estado === 'pendiente').length} pendientes</span>
                     </div>
                 </div>
             `).join('');
@@ -688,7 +822,7 @@ $conn->close();
             activitiesList.innerHTML = allActivities.map(activity => {
                 const date = new Date(activity.date);
                 const dateStr = `${date.getDate()}/${date.getMonth() + 1}`;
-                const typeIcon = activity.type === 'exam' ? '📊' : activity.type === 'quiz' ? '❓' : '📝';
+                const typeIcon = activity.type === 'quiz' ? '❓' : activity.type === 'project' ? '🚀' : '📝';
                 
                 return `
                     <div class="activity-item">

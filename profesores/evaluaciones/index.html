@@ -691,5 +691,58 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const selectCurso = document.getElementById("selectCurso");
+  const selectGrupo = document.getElementById("selectGrupo");
+  const selectAlumnos = document.getElementById("selectAlumnos");
+
+  // Cargar cursos del profesor
+  fetch("obtener_datos_evaluacion.php?accion=cursos")
+    .then(res => res.json())
+    .then(cursos => {
+      cursos.forEach(curso => {
+        const opt = document.createElement("option");
+        opt.value = curso.CursoID;
+        opt.textContent = curso.NombreCurso;
+        selectCurso.appendChild(opt);
+      });
+    });
+
+  // Cuando elige un curso
+  selectCurso.addEventListener("change", () => {
+    const cursoID = selectCurso.value;
+    selectGrupo.innerHTML = "<option value=''>Selecciona grupo</option>";
+    selectAlumnos.innerHTML = "";
+
+    if (!cursoID) return;
+
+    // Cargar grupos
+    fetch(`obtener_datos_evaluacion.php?accion=grupos&cursoID=${cursoID}`)
+      .then(res => res.json())
+      .then(grupos => {
+        grupos.forEach(g => {
+          const opt = document.createElement("option");
+          opt.value = g.GrupoID;
+          opt.textContent = g.NombreGrupo;
+          selectGrupo.appendChild(opt);
+        });
+      });
+
+    // Cargar alumnos
+    fetch(`obtener_datos_evaluacion.php?accion=alumnos&cursoID=${cursoID}`)
+      .then(res => res.json())
+      .then(alumnos => {
+        alumnos.forEach(a => {
+          const li = document.createElement("li");
+          li.textContent = a.NombreCompleto;
+          selectAlumnos.appendChild(li);
+        });
+      });
+  });
+});
+</script>
+<script src="script_guardar_evaluacion.js"></script>
+<script src="script_obtener_datos_evaluacion.js"></script>
 </body>
 </html>

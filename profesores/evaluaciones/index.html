@@ -139,7 +139,7 @@
       renderCourseSelector();
       
       // 3. Cargar listas iniciales (o vacías)
-      loadStudentsAndGroups();
+      loadStudentsAndGroups(null);
       renderAssignments();
     }
     
@@ -154,7 +154,7 @@
         });
     }
 
-    // 🎯 NUEVO: Lógica de cascada al cambiar el curso seleccionado
+    // Lógica de cascada al cambiar el curso seleccionado
     document.getElementById('select-curso-asignacion').addEventListener('change', async (e) => {
         currentCursoID = e.target.value;
         if (currentCursoID) {
@@ -173,7 +173,7 @@
         });
     });
 
-    // 🎯 MODIFICADO: Esta función ahora usa el CursoID para cargar datos
+    // Esta función ahora usa el CursoID para cargar datos
     async function loadStudentsAndGroups(cursoID) {
         if (!cursoID) {
             students = [];
@@ -186,12 +186,12 @@
         }
         
         // 3. Renderizar las listas y grids con datos del curso
-        renderStudentsGrid();
+        renderStudentsGrid(); // Llama sin argumentos para mostrar todos los del curso por defecto
         renderGroupsGrid();
         // Las listas de gestión (students-modal) solo se actualizan al abrirlas si es necesario
     }
     
-    // 🎯 MODIFICADO: Esta función debe reaccionar a la SELECCIÓN DE GRUPOS
+    // Esta función debe reaccionar a la SELECCIÓN DE GRUPOS
     document.getElementById('groups-grid').addEventListener('change', (e) => {
         if (e.target.type === 'checkbox') {
             updateStudentsGridByGroupSelection();
@@ -202,34 +202,35 @@
         return Array.from(document.querySelectorAll('#groups-grid input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
     }
     
-    // 🎯 NUEVO: Filtra y muestra solo los alumnos que pertenecen al grupo/curso seleccionado
+    // Filtra y muestra solo los alumnos que pertenecen al grupo/curso seleccionado
     async function updateStudentsGridByGroupSelection() {
         const selectedGroupIDs = getSelectedGroupIDs();
         
-        // Si no hay grupos seleccionados, mostramos todos los estudiantes del curso
         let studentsToShow = students;
 
         if (selectedGroupIDs.length > 0) {
-            // 🚨 Aquí deberías llamar a un nuevo endpoint PHP para obtener alumnos por GrupoID
-            // Por simplicidad, usaremos la lógica actual que trae todos los del curso,
-            // pero lo ideal es: fetchFromBackend('alumnosPorGrupos', { groupIDs: selectedGroupIDs.join(',') })
-            
-            // Lógica ideal (Requiere PHP modificado):
+            // Llamada al endpoint PHP modificado: alumnosPorGrupos
             const alumnosPorGrupos = await fetchFromBackend('alumnosPorGrupos', { groupIDs: selectedGroupIDs.join(',') });
+            // Solo mostramos los estudiantes que están en el curso actual (redundante si la DB es correcta, pero seguro)
             studentsToShow = alumnosPorGrupos.filter(a => students.some(s => s.EstID === a.EstID));
         }
 
         renderStudentsGrid(studentsToShow);
     }
     
-    // 🎯 MODIFICADO: Ahora puede recibir una lista de estudiantes a renderizar
+    // Ahora puede recibir una lista de estudiantes a renderizar
     function renderStudentsGrid(studentsList = students) {
       const grid = document.getElementById('students-grid');
       // Limpiar antes de re-renderizar
       grid.innerHTML = '';
 
+      if (!currentCursoID) {
+          grid.innerHTML = '<p style="color: #6b7280; font-style: italic; padding: 10px;">Selecciona un curso primero.</p>';
+          return;
+      }
+
       if (studentsList.length === 0) {
-          grid.innerHTML = '<p style="color: #6b7280; font-style: italic; padding: 10px;">Selecciona un curso y/o grupo para ver los estudiantes.</p>';
+          grid.innerHTML = '<p style="color: #6b7280; font-style: italic; padding: 10px;">No hay estudiantes registrados en este curso o grupo(s).</p>';
           return;
       }
 
@@ -250,6 +251,18 @@
     
     function renderGroupsGrid() {
       const grid = document.getElementById('groups-grid');
+      // Limpiar antes de re-renderizar
+      grid.innerHTML = '';
+      
+      if (!currentCursoID) {
+          grid.innerHTML = '<p style="color: #6b7280; font-style: italic; padding: 10px;">Selecciona un curso primero.</p>';
+          return;
+      }
+      if (groups.length === 0) {
+          grid.innerHTML = '<p style="color: #6b7280; font-style: italic; padding: 10px;">No hay grupos registrados en este curso.</p>';
+          return;
+      }
+      
       grid.innerHTML = groups.map((group) => `
         <div class="group-item" data-id="${group.GrupoID}">
           <input type="checkbox" id="group-${group.GrupoID}" value="${group.GrupoID}">
@@ -265,117 +278,116 @@
       });
     }
     
-    // ... (El resto de funciones como renderStudentsList, addStudent, removeStudent, etc. se mantienen) ...
-    // ... (Se mantienen getAssignmentStatus, getStatusText, filterAssignments, renderAssignments, etc.) ...
+    // Lógica para abrir el modal (Solución al problema anterior)
+    function openAssignmentModal() {
+      document.getElementById('assignment-form').reset();
+      document.getElementById('modal-title').textContent = '📝 Nueva Asignación de Evaluación';
+      document.getElementById('submit-assignment-btn').textContent = 'Crear Asignación';
+      delete document.getElementById('assignment-form').dataset.editId;
+      
+      // Limpiar el selector de curso y los grids de asignación al abrir
+      document.getElementById('select-curso-asignacion').value = '';
+      currentCursoID = null;
+      loadStudentsAndGroups(null); // Limpiar estudiantes y grupos
+      
+      // Limpiar selecciones
+      document.querySelectorAll('.student-item, .group-item').forEach(item => {
+        item.classList.remove('selected');
+        item.querySelector('input[type="checkbox"]').checked = false;
+      });
+      
+      // Establecer fecha por defecto (una semana desde hoy)
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      const dueDateInput = document.getElementById('eval-due-date');
+      if (dueDateInput) {
+          dueDateInput.value = nextWeek.toISOString().slice(0, 16);
+      }
+      
+      document.getElementById('assignment-modal').classList.add('active');
+    }
     
-    // 🎯 FUNCIÓN DE ENVÍO MODIFICADA para validar el CursoID
-    document.getElementById('assignment-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const cursoIDAsignacion = document.getElementById('select-curso-asignacion').value;
-      const title = document.getElementById('eval-title').value.trim();
-      const description = document.getElementById('eval-description').value.trim();
-      const dueDate = document.getElementById('eval-due-date').value;
-      const maxScore = parseInt(document.getElementById('eval-max-score').value);
-      const instructions = document.getElementById('eval-instructions').value.trim();
-      
-      if (!cursoIDAsignacion) {
-        showToast('Debes seleccionar un curso para asignar la evaluación', 'error');
-        return;
+    // Lógica de visualización y filtrado (simplificada)
+    function getAssignmentStatus(assignment) {
+      const dueDate = new Date(assignment.dueDate);
+      const now = new Date();
+      if (dueDate < now) return 'overdue';
+      if (dueDate - now < 24 * 60 * 60 * 1000) return 'pending';
+      return 'active';
+    }
+    
+    function getStatusText(status) {
+      switch (status) {
+        case 'active': return 'Activo';
+        case 'pending': return 'Próximo';
+        case 'overdue': return 'Vencido';
+        default: return 'Activo';
       }
-
-      // CAPTURAR LOS IDS SELECCIONADOS COMO NÚMEROS ENTEROS
-      const selectedStudents = Array.from(document.querySelectorAll('#students-grid input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
-      const selectedGroups = Array.from(document.querySelectorAll('#groups-grid input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
-      
-      if (selectedStudents.length === 0 && selectedGroups.length === 0) {
-        showToast('Debes seleccionar al menos un estudiante o grupo', 'error');
-        return;
-      }
-      
-      const submitBtn = document.getElementById('submit-assignment-btn');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner"></span>Guardando...';
-      
-      const assignmentData = {
-        cursoID: cursoIDAsignacion, // Usar el ID del curso seleccionado
-        titulo: title, 
-        descripcion: description,
-        puntos: maxScore,
-        fechaVencimiento: dueDate,
-        assignedStudents: JSON.stringify(selectedStudents), 
-        assignedGroups: JSON.stringify(selectedGroups),
+    }
+    
+    function filterAssignments() {
+        const statusFilter = document.getElementById('status-filter').value;
+        const searchFilter = document.getElementById('search-filter').value.toLowerCase();
         
-        duracion: 60,
-        totalPreguntas: 10,
-        intentos: 1,
-        requiereArchivo: 0
-      };
-      
-      const formData = new FormData();
-      for (const key in assignmentData) {
-          formData.append(key, assignmentData[key]);
-      }
-
-      let result;
-      let isEdit = document.getElementById('assignment-form').dataset.editId;
-      
-      if (isEdit) {
-          // Lógica de Edición (usando SDK o un endpoint de update)
-          // ... (mantener la lógica de edición si la usas) ...
-          
-      } else {
-        // Enviar a guardar_evaluacion.php
-        const response = await fetch('guardar_evaluacion.php', {
-            method: 'POST',
-            body: formData
+        return assignments.filter(assignment => {
+            const matchesStatus = statusFilter === 'all' || getAssignmentStatus(assignment) === statusFilter;
+            const matchesSearch = assignment.evaluationTitle.toLowerCase().includes(searchFilter) ||
+                                assignment.description.toLowerCase().includes(searchFilter);
+            return matchesStatus && matchesSearch;
         });
-        result = await response.json();
-      }
-      
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = isEdit ? 'Actualizar Asignación' : 'Crear Asignación';
-      
-      if (result.status === 'success' || (isEdit && result.isOk)) {
-        showToast(isEdit ? 'Asignación actualizada exitosamente' : result.message, 'success');
-        document.getElementById('assignment-modal').classList.remove('active');
-        // Limpiar formulario y recargar datos
-        document.getElementById('assignment-form').reset();
-        document.getElementById('select-curso-asignacion').value = '';
-        await loadStudentsAndGroups(null); // Limpiar estudiantes y grupos
-        // Recargar la lista de asignaciones si no usas el SDK automático
-      } else {
-        showToast(`Error al guardar: ${result.message || 'Error desconocido'}`, 'error');
-      }
-    });
-    
-    // ... (Resto de Event Listeners y funciones auxiliares) ...
-    
-    function renderStudentsList() {
-      // Usar 'courses' si necesitas mostrar a qué curso pertenecen, pero por ahora solo es la lista local
-      const list = document.getElementById('students-list');
-      list.innerHTML = `
-        <h4 style="margin: 20px 0 12px 0; color: #374151;">Estudiantes Registrados (General)</h4>
-        <div style="max-height: 300px; overflow-y: auto;">
-            <p style="color: #6b7280; font-style: italic; padding: 10px;">Esta lista solo muestra datos del curso seleccionado si lo cargaste.</p>
-        </div>
-      `;
     }
 
-    function renderGroupsList() {
-        const list = document.getElementById('groups-list');
-        list.innerHTML = `
-            <h4 style="margin: 20px 0 12px 0; color: #374151;">Grupos Registrados (General)</h4>
-            <div style="max-height: 300px; overflow-y: auto;">
-                <p style="color: #6b7280; font-style: italic; padding: 10px;">Esta lista solo muestra datos del curso seleccionado si lo cargaste.</p>
-            </div>
+    function renderAssignments() {
+      const container = document.getElementById('assignments-container');
+      const filteredAssignments = filterAssignments();
+      
+      if (filteredAssignments.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <h3>No hay asignaciones</h3>
+            <p>Comienza creando tu primera asignación de evaluación para organizar el trabajo de tus estudiantes</p>
+            <button class="btn btn-primary" onclick="openAssignmentModal()">Crear Primera Asignación</button>
+          </div>
         `;
+        return;
+      }
+      
+      container.innerHTML = `<div class="assignments-grid">${filteredAssignments.map(assignment => {
+        const status = getAssignmentStatus(assignment);
+        const dueDate = new Date(assignment.dueDate);
+        const assignedStudents = assignment.assignedStudents ? JSON.parse(assignment.assignedStudents) : [];
+        const assignedGroups = assignment.assignedGroups ? JSON.parse(assignment.assignedGroups) : [];
+        
+        return `
+          <div class="assignment-card ${status}" data-id="${assignment.id}">
+            <div class="assignment-header">
+              <h3 class="assignment-title">${assignment.evaluationTitle}</h3>
+              <span class="status-badge ${status}">${getStatusText(status)}</span>
+            </div>
+            
+            <p class="assignment-description">${assignment.description}</p>
+            
+            <div class="assigned-to">
+              <h4>👥 Estudiantes Asignados (${assignedStudents.length})</h4>
+              <div class="assigned-students">
+                ${assignedStudents.slice(0, 5).map(id => `<span class="student-tag">${getStudentName(id)}</span>`).join('')}
+                ${assignedStudents.length > 5 ? `<span class="student-tag">+${assignedStudents.length - 5} más</span>` : ''}
+              </div>
+            </div>
+            
+            <div class="card-actions">
+              <button class="btn btn-primary view-btn" data-id="${assignment.id}">Ver Detalles</button>
+            </div>
+          </div>
+        `;
+      }).join('')}</div>`;
+      
+      document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', (e) => viewAssignmentDetails(e.target.dataset.id)));
+      document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => editAssignment(e.target.dataset.id)));
+      document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => deleteAssignment(e.target.dataset.id)));
     }
-    
-    // Aquí van el resto de funciones (viewAssignmentDetails, editAssignment, deleteAssignment, showToast, onConfigChange, etc.)
-    // ... [FIN DEL CÓDIGO JS QUE DEBE SER IGUAL AL ANTERIOR, EXCEPTO LOS MODIFICADOS ARRIBA] ...
-    
-    // --- Código auxiliar para mantener las demás funciones ---
+
     function viewAssignmentDetails(id) {
         const assignment = assignments.find(a => a.id === id);
         if (!assignment) return;
@@ -431,110 +443,224 @@
         
         document.getElementById('assignment-modal').classList.add('active');
     }
+    
+    async function deleteAssignment(id) {
+        const assignment = assignments.find(a => a.id === id);
+        if (!assignment) return;
+        
+        const card = document.querySelector(`[data-id="${id}"]`);
+        const deleteBtn = card.querySelector('.delete-btn');
+        
+        if (deleteBtn.textContent === 'Eliminar') {
+            deleteBtn.textContent = '¿Confirmar?';
+            deleteBtn.classList.remove('btn-danger');
+            deleteBtn.classList.add('btn-secondary');
+            
+            setTimeout(() => {
+                if (deleteBtn.textContent === '¿Confirmar?') {
+                    deleteBtn.textContent = 'Eliminar';
+                    deleteBtn.classList.remove('btn-secondary');
+                    deleteBtn.classList.add('btn-danger');
+                }
+            }, 3000);
+            return;
+        }
+        
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<span class="spinner"></span>Eliminando...';
+        
+        // Simulación de eliminación (Si usas el SDK, descomenta la línea de result)
+        // const result = await window.dataSdk.delete(assignment);
+        const result = { isOk: true }; // Simulación de éxito
 
-    // Funciones auxiliares mínimas
-    function getAssignmentStatus(assignment) {
-      const dueDate = new Date(assignment.dueDate);
-      const now = new Date();
-      if (dueDate < now) return 'overdue';
-      if (dueDate - now < 24 * 60 * 60 * 1000) return 'pending';
-      return 'active';
+        if (result.isOk) {
+            showToast('Asignación eliminada exitosamente', 'success');
+            // Recargar la lista de asignaciones si es necesario
+        } else {
+            showToast('Error al eliminar la asignación', 'error');
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = 'Eliminar';
+        }
+    }
+
+    // Funciones para gestionar listas (Simulación local)
+    function renderStudentsList() {
+      const list = document.getElementById('students-list');
+      list.innerHTML = `<h4 style="margin: 20px 0 12px 0; color: #374151;">Estudiantes Registrados (General)</h4><div style="max-height: 300px; overflow-y: auto;"><p style="color: #6b7280; font-style: italic; padding: 10px;">Esta lista solo muestra datos del curso seleccionado si lo cargaste.</p></div>`;
     }
     
-    function getStatusText(status) {
-      switch (status) {
-        case 'active': return 'Activo';
-        case 'pending': return 'Próximo';
-        case 'overdue': return 'Vencido';
-        default: return 'Activo';
-      }
+    function renderGroupsList() {
+        const list = document.getElementById('groups-list');
+        list.innerHTML = `<h4 style="margin: 20px 0 12px 0; color: #374151;">Grupos Registrados (General)</h4><div style="max-height: 300px; overflow-y: auto;"><p style="color: #6b7280; font-style: italic; padding: 10px;">Esta lista solo muestra datos del curso seleccionado si lo cargaste.</p></div>`;
     }
     
-    function filterAssignments() {
-        // Lógica de filtrado
-        return assignments; // Simplificado para este ejemplo
-    }
-
-    function renderAssignments() {
-      // Lógica de renderizado de tarjetas
-      const container = document.getElementById('assignments-container');
-      const filteredAssignments = filterAssignments();
+    function addStudent() { showToast('Funcionalidad de agregar estudiante requiere endpoint PHP', 'error'); }
+    function addGroup() { showToast('Funcionalidad de agregar grupo requiere endpoint PHP', 'error'); }
+    function removeStudent(id) { showToast('Funcionalidad de eliminar estudiante requiere endpoint PHP', 'error'); }
+    function removeGroup(id) { showToast('Funcionalidad de eliminar grupo requiere endpoint PHP', 'error'); }
+    
+    // --- Event Listener de Envío de Formulario ---
+    document.getElementById('assignment-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
       
-      if (filteredAssignments.length === 0) {
-        container.innerHTML = `<div class="empty-state">...</div>`;
+      const cursoIDAsignacion = document.getElementById('select-curso-asignacion').value;
+      const title = document.getElementById('eval-title').value.trim();
+      const description = document.getElementById('eval-description').value.trim();
+      const dueDate = document.getElementById('eval-due-date').value;
+      const maxScore = parseInt(document.getElementById('eval-max-score').value);
+      
+      if (!cursoIDAsignacion) {
+        showToast('Debes seleccionar un curso para asignar la evaluación', 'error');
         return;
       }
-      container.innerHTML = `<div class="assignments-grid">${filteredAssignments.map(assignment => {
-        const status = getAssignmentStatus(assignment);
-        const dueDate = new Date(assignment.dueDate);
-        const assignedStudents = assignment.assignedStudents ? JSON.parse(assignment.assignedStudents) : [];
-        const assignedGroups = assignment.assignedGroups ? JSON.parse(assignment.assignedGroups) : [];
-        
-        return `
-          <div class="assignment-card ${status}" data-id="${assignment.id}">
-            <div class="assignment-header">
-              <h3 class="assignment-title">${assignment.evaluationTitle}</h3>
-              <span class="status-badge ${status}">${getStatusText(status)}</span>
-            </div>
-            <p class="assignment-description">${assignment.description}</p>
-            <div class="assigned-to">
-              <h4>👥 Estudiantes Asignados (${assignedStudents.length})</h4>
-              <div class="assigned-students">${assignedStudents.slice(0, 5).map(id => `<span class="student-tag">${getStudentName(id)}</span>`).join('')}</div>
-            </div>
-            <div class="card-actions">
-              <button class="btn btn-primary view-btn" data-id="${assignment.id}">Ver Detalles</button>
-            </div>
-          </div>
-        `;
-      }).join('')}</div>`;
 
-      document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', (e) => viewAssignmentDetails(e.target.dataset.id)));
-      document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => editAssignment(e.target.dataset.id)));
-      document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => deleteAssignment(e.target.dataset.id)));
+      const selectedStudents = Array.from(document.querySelectorAll('#students-grid input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
+      const selectedGroups = Array.from(document.querySelectorAll('#groups-grid input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
+      
+      if (selectedStudents.length === 0 && selectedGroups.length === 0) {
+        showToast('Debes seleccionar al menos un estudiante o grupo', 'error');
+        return;
+      }
+      
+      const submitBtn = document.getElementById('submit-assignment-btn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span>Guardando...';
+      
+      const assignmentData = {
+        cursoID: cursoIDAsignacion, 
+        titulo: title, 
+        descripcion: description,
+        puntos: maxScore,
+        fechaVencimiento: dueDate,
+        assignedStudents: JSON.stringify(selectedStudents), 
+        assignedGroups: JSON.stringify(selectedGroups),
+        
+        // Valores por defecto
+        duracion: 60,
+        totalPreguntas: 10,
+        intentos: 1,
+        requiereArchivo: 0
+      };
+      
+      const formData = new FormData();
+      for (const key in assignmentData) {
+          formData.append(key, assignmentData[key]);
+      }
+
+      let result;
+      let isEdit = document.getElementById('assignment-form').dataset.editId;
+      
+      if (isEdit) {
+          // Simulación de edición o uso de SDK
+          // ...
+          result = { status: 'success', message: 'Evaluación actualizada correctamente'};
+      } else {
+        // Enviar a guardar_evaluacion.php
+        const response = await fetch('guardar_evaluacion.php', {
+            method: 'POST',
+            body: formData
+        });
+        result = await response.json();
+      }
+      
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = isEdit ? 'Actualizar Asignación' : 'Crear Asignación';
+      
+      if (result.status === 'success' || (isEdit && result.isOk)) {
+        showToast(isEdit ? 'Asignación actualizada exitosamente' : result.message, 'success');
+        document.getElementById('assignment-modal').classList.remove('active');
+        // Limpiar formulario y grids
+        document.getElementById('assignment-form').reset();
+        document.getElementById('select-curso-asignacion').value = '';
+        await loadStudentsAndGroups(null); 
+        // Lógica de recarga de la lista de asignaciones aquí
+      } else {
+        showToast(`Error al guardar: ${result.message || 'Error desconocido'}`, 'error');
+      }
+    });
+    
+    // Función de Toast
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast ${type} show`;
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 4000);
     }
 
-
-    // Event Listeners restantes
+    // Event Listeners (Asegura la apertura del modal)
     document.getElementById('create-assignment-btn').addEventListener('click', openAssignmentModal);
+    
     document.getElementById('manage-students-btn').addEventListener('click', () => { document.getElementById('students-modal').classList.add('active'); });
     document.getElementById('manage-groups-btn').addEventListener('click', () => { document.getElementById('groups-modal').classList.add('active'); });
     document.getElementById('cancel-assignment-btn').addEventListener('click', () => { document.getElementById('assignment-modal').classList.remove('active'); });
     document.getElementById('close-students-btn').addEventListener('click', () => { document.getElementById('students-modal').classList.remove('active'); });
     document.getElementById('close-groups-btn').addEventListener('click', () => { document.getElementById('groups-modal').classList.remove('active'); });
-
-    // Funciones add/remove Student/Group (simuladas localmente)
-    function addStudent() { showToast('Funcionalidad de agregar estudiante requiere endpoint PHP', 'error'); }
-    function addGroup() { showToast('Funcionalidad de agregar grupo requiere endpoint PHP', 'error'); }
-    function removeStudent(id) { showToast('Funcionalidad de eliminar estudiante requiere endpoint PHP', 'error'); }
-    function removeGroup(id) { showToast('Funcionalidad de eliminar grupo requiere endpoint PHP', 'error'); }
-
     document.getElementById('add-student-btn').addEventListener('click', addStudent);
     document.getElementById('add-group-btn').addEventListener('click', addGroup);
-
-    // Funciones de Toast y Configuración SDK
-    function showToast(message, type = 'success') {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.className = `toast ${type} show`;
-      setTimeout(() => { toast.classList.remove('show'); }, 4000);
+    document.getElementById('status-filter').addEventListener('change', renderAssignments);
+    document.getElementById('search-filter').addEventListener('input', renderAssignments);
+    
+    // --- Funciones de configuración SDK (Mantener si usas ElementSDK) ---
+    async function onConfigChange(config) {
+      document.getElementById('app-title').textContent = config.app_title || defaultConfig.app_title;
+      document.getElementById('welcome-message').textContent = config.welcome_message || defaultConfig.welcome_message;
+      
+      const primaryColor = config.primary_color || defaultConfig.primary_color;
+      const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      const successColor = config.success_color || defaultConfig.success_color;
+      const dangerColor = config.danger_color || defaultConfig.danger_color;
+      
+      document.body.style.background = `linear-gradient(135deg, ${primaryColor} 0%, #7c3aed 100%)`;
+      
+      document.querySelectorAll('.btn-primary').forEach(btn => {
+        btn.style.background = primaryColor;
+      });
+      
+      document.querySelectorAll('.btn-success').forEach(btn => {
+        btn.style.background = successColor;
+      });
+      
+      document.querySelectorAll('.btn-danger').forEach(btn => {
+        btn.style.background = dangerColor;
+      });
+      
+      document.querySelectorAll('.header, .actions-bar, .assignment-card, .modal-content, .empty-state, .filter-bar').forEach(el => {
+        el.style.background = secondaryColor;
+      });
+      
+      document.querySelectorAll('h1, h2, h3, .assignment-title').forEach(el => {
+        el.style.color = textColor;
+      });
     }
 
-    // Funciones de onConfigChange y ElementSDK (dejadas por fuera por espacio, asume que se mantienen si las usas)
-    // ...
-
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            { get: () => config.primary_color || defaultConfig.primary_color, set: (value) => { config.primary_color = value; window.elementSdk.setConfig({ primary_color: value }); } },
+            { get: () => config.secondary_color || defaultConfig.secondary_color, set: (value) => { config.secondary_color = value; window.elementSdk.setConfig({ secondary_color: value }); } },
+            { get: () => config.text_color || defaultConfig.text_color, set: (value) => { config.text_color = value; window.elementSdk.setConfig({ text_color: value }); } },
+            { get: () => config.success_color || defaultConfig.success_color, set: (value) => { config.success_color = value; window.elementSdk.setConfig({ success_color: value }); } },
+            { get: () => config.danger_color || defaultConfig.danger_color, set: (value) => { config.danger_color = value; window.elementSdk.setConfig({ danger_color: value }); } }
+          ],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["app_title", config.app_title || defaultConfig.app_title],
+          ["welcome_message", config.welcome_message || defaultConfig.welcome_message]
+        ])
+      });
+    }
+    
     initializeApp();
   </script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  // Eliminado: La lógica de formulario se movió a la etiqueta <script> principal
-});
-</script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  // Eliminado: La lógica de cargar datos se movió a la etiqueta <script> principal
-});
-</script>
-<script src="script_guardar_evaluacion.js"></script>
-<script src="script_obtener_datos_evaluacion.js"></script>
 </body>
 </html>

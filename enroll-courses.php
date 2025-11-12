@@ -1,10 +1,4 @@
 <?php
-// forzar logout en pruebas
-session_start();
-unset($_SESSION['student_id']);
-unset($_SESSION['student_name']);
-?>
-<?php
 session_start();
 require_once __DIR__ . '/conexion.php';
 

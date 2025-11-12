@@ -1,672 +1,223 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
- <head>
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Asignación de Evaluaciones</title>
-  <script src="/_sdk/data_sdk.js"></script>
-  <script src="/_sdk/element_sdk.js"></script>
- <link rel="stylesheet" href="./evaluaciones.css">
-  <style>@view-transition { navigation: auto; }</style>
-  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
- </head>
- <body>
+  <title>Asignar Evaluaciones - Hoot & Learn</title>
+  <style>
+    /* === TU CSS ORIGINAL AQUÍ === */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f3f4f6;
+    }
+    header {
+      background-color: #6b21a8;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      background-color: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    h2 {
+      color: #4c1d95;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+    th {
+      background-color: #ede9fe;
+      color: #4c1d95;
+    }
+    tr:hover {
+      background-color: #f5f3ff;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #7e22ce;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background-color: #5b21b6;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 400px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>Asignar Evaluaciones - Hoot & Learn</header>
+
   <div class="container">
-   <div class="header">
-    <h1 id="app-title">📋 Asignación de Evaluaciones</h1>
-    <p id="welcome-message">Asigna evaluaciones a estudiantes y grupos de forma organizada</p>
-   </div>
-   <div class="actions-bar"><button class="btn btn-primary" id="create-assignment-btn"> ➕ Nueva Asignación </button> <button class="btn btn-secondary" id="manage-students-btn"> 👥 Gestionar Estudiantes </button> <button class="btn btn-secondary" id="manage-groups-btn"> 🏫 Gestionar Grupos </button>
-   </div>
-   <div class="filter-bar">
-    <div class="filter-group"><label for="status-filter">Estado:</label> <select id="status-filter"> <option value="all">Todos</option> <option value="active">Activos</option> <option value="pending">Pendientes</option> <option value="overdue">Vencidos</option> </select>
-    </div>
-    <div class="filter-group"><label for="search-filter">Buscar:</label> <input type="text" id="search-filter" placeholder="Título de evaluación..." style="padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
-    </div>
-   </div>
-   <div id="assignments-container"></div>
-  </div><!-- Modal para crear asignación -->
-  <div class="modal" id="assignment-modal">
-   <div class="modal-content">
-    <h2 id="modal-title">📝 Nueva Asignación de Evaluación</h2>
-    <form id="assignment-form">
-     <div class="form-group"><label for="eval-title">Título de la Evaluación</label> <input type="text" id="eval-title" required placeholder="Ej: Examen Final de Matemáticas">
-     </div>
-     <div class="form-group"><label for="eval-description">Descripción</label> <textarea id="eval-description" required placeholder="Describe los objetivos y contenido de la evaluación"></textarea>
-     </div>
-     <div class="form-row">
-      <div class="form-group"><label for="eval-due-date">Fecha de Entrega</label> <input type="datetime-local" id="eval-due-date" required>
+    <h2>Gestión de Evaluaciones</h2>
+
+    <button class="btn" onclick="abrirModal()">+ Agregar Asignación</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Descripción</th>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>Grupo</th>
+        </tr>
+      </thead>
+      <tbody id="tablaEvaluaciones">
+        <!-- Aquí se mostrarán las evaluaciones -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- === Modal para agregar evaluación === -->
+  <div class="modal" id="modalEvaluacion">
+    <div class="modal-content">
+      <h3>Nueva Evaluación</h3>
+      <label>Nombre de la Evaluación:</label>
+      <input type="text" id="nombreEvaluacion" placeholder="Ej: Examen Unidad 1">
+
+      <label>Descripción:</label>
+      <textarea id="descripcionEvaluacion" placeholder="Descripción de la evaluación"></textarea>
+
+      <label>Fecha de entrega:</label>
+      <input type="date" id="fechaEvaluacion">
+
+      <label>Tipo:</label>
+      <select id="tipoEvaluacion">
+        <option value="Examen">Examen</option>
+        <option value="Tarea">Tarea</option>
+        <option value="Proyecto">Proyecto</option>
+      </select>
+
+      <label>Grupo:</label>
+      <select id="selectGrupo">
+        <option value="">-- Selecciona un grupo --</option>
+        <option value="1">Grupo A</option>
+        <option value="2">Grupo B</option>
+        <option value="3">Grupo C</option>
+      </select>
+
+      <div style="text-align:right; margin-top:15px;">
+        <button class="btn" onclick="guardarAsignacion()">Guardar</button>
+        <button class="btn" style="background:#a1a1aa;" onclick="cerrarModal()">Cancelar</button>
       </div>
-      <div class="form-group"><label for="eval-max-score">Puntuación Máxima</label> <input type="number" id="eval-max-score" required min="1" value="100">
-      </div>
-     </div>
-     <div class="form-group"><label for="eval-instructions">Instrucciones Especiales</label> <textarea id="eval-instructions" placeholder="Instrucciones adicionales para los estudiantes"></textarea>
-     </div>
-     <div class="student-selector">
-      <h4>👥 Seleccionar Estudiantes</h4>
-      <div class="students-grid" id="students-grid"><!-- Estudiantes se cargarán aquí -->
-      </div>
-     </div>
-     <div class="groups-selector">
-      <h4>🏫 Seleccionar Grupos</h4>
-      <div class="groups-grid" id="groups-grid"><!-- Grupos se cargarán aquí -->
-      </div>
-     </div>
-     <div class="modal-actions"><button type="button" class="btn btn-secondary" id="cancel-assignment-btn">Cancelar</button> <button type="submit" class="btn btn-primary" id="submit-assignment-btn">Crear Asignación</button>
-     </div>
-    </form>
-   </div>
-  </div><!-- Modal para gestionar estudiantes -->
-  <div class="modal" id="students-modal">
-   <div class="modal-content">
-    <h2>👥 Gestionar Estudiantes</h2>
-    <div class="form-group"><label for="new-student">Agregar Nuevo Estudiante</label>
-     <div style="display: flex; gap: 12px;"><input type="text" id="new-student" placeholder="Nombre del estudiante" style="flex: 1;"> <button type="button" class="btn btn-success" id="add-student-btn">Agregar</button>
-     </div>
     </div>
-    <div id="students-list"></div>
-    <div class="modal-actions"><button type="button" class="btn btn-secondary" id="close-students-btn">Cerrar</button>
-    </div>
-   </div>
-  </div><!-- Modal para gestionar grupos -->
-  <div class="modal" id="groups-modal">
-   <div class="modal-content">
-    <h2>🏫 Gestionar Grupos</h2>
-    <div class="form-group"><label for="new-group">Agregar Nuevo Grupo</label>
-     <div style="display: flex; gap: 12px;"><input type="text" id="new-group" placeholder="Nombre del grupo" style="flex: 1;"> <button type="button" class="btn btn-success" id="add-group-btn">Agregar</button>
-     </div>
-    </div>
-    <div id="groups-list"></div>
-    <div class="modal-actions"><button type="button" class="btn btn-secondary" id="close-groups-btn">Cerrar</button>
-    </div>
-   </div>
-  </div><!-- Toast para notificaciones -->
-  <div class="toast" id="toast"></div>
+  </div>
+
   <script>
-    const defaultConfig = {
-      app_title: "📋 Asignación de Evaluaciones",
-      welcome_message: "Asigna evaluaciones a estudiantes y grupos de forma organizada",
-      primary_color: "#4f46e5",
-      secondary_color: "#ffffff",
-      text_color: "#1e293b",
-      success_color: "#10b981",
-      danger_color: "#ef4444"
-    };
-    
-    let assignments = [];
-    let students = ['Ana García', 'Carlos López', 'María Rodríguez', 'Juan Pérez', 'Laura Martín', 'Diego Silva', 'Carmen Ruiz', 'Pablo Torres'];
-    let groups = ['Grupo A', 'Grupo B', 'Grupo C', 'Matemáticas Avanzadas', 'Ciencias Naturales'];
-    
-    const dataHandler = {
-      onDataChanged(data) {
-        assignments = data;
-        renderAssignments();
-      }
-    };
-    
-    async function initializeApp() {
-      const initResult = await window.dataSdk.init(dataHandler);
-      if (!initResult.isOk) {
-        showToast('Error al inicializar el sistema', 'error');
-        console.error('Failed to initialize data SDK');
-      }
-      
-      loadStudentsAndGroups();
+    // === Funciones para abrir/cerrar el modal ===
+    function abrirModal() {
+      document.getElementById('modalEvaluacion').style.display = 'flex';
     }
-    
-    function loadStudentsAndGroups() {
-      renderStudentsGrid();
-      renderGroupsGrid();
-      renderStudentsList();
-      renderGroupsList();
+    function cerrarModal() {
+      document.getElementById('modalEvaluacion').style.display = 'none';
+      document.getElementById('nombreEvaluacion').value = '';
+      document.getElementById('descripcionEvaluacion').value = '';
+      document.getElementById('fechaEvaluacion').value = '';
+      document.getElementById('tipoEvaluacion').value = 'Examen';
+      document.getElementById('selectGrupo').value = '';
     }
-    
-    function renderStudentsGrid() {
-      const grid = document.getElementById('students-grid');
-      grid.innerHTML = students.map((student, index) => `
-        <div class="student-item" data-student="${student}">
-          <input type="checkbox" id="student-${index}" value="${student}">
-          <label for="student-${index}">${student}</label>
-        </div>
-      `).join('');
-      
-      grid.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-          const item = e.target.closest('.student-item');
-          item.classList.toggle('selected', e.target.checked);
+
+    // === AQUÍ VIENE LA FUNCIÓN DE GUARDADO REAL ===
+    async function guardarAsignacion() {
+      const nombre = document.getElementById('nombreEvaluacion').value.trim();
+      const descripcion = document.getElementById('descripcionEvaluacion').value.trim();
+      const fecha = document.getElementById('fechaEvaluacion').value;
+      const tipo = document.getElementById('tipoEvaluacion').value;
+      const grupo_id = document.getElementById('selectGrupo').value;
+
+      if (!nombre || !grupo_id) {
+        alert('Debes ingresar un nombre y seleccionar un grupo.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('nombre', nombre);
+      formData.append('descripcion', descripcion);
+      formData.append('fecha', fecha);
+      formData.append('tipo', tipo);
+      formData.append('grupo_id', grupo_id);
+
+      try {
+        const response = await fetch('agregar_asignacion.php', {
+          method: 'POST',
+          body: formData
         });
-      });
-    }
-    
-    function renderGroupsGrid() {
-      const grid = document.getElementById('groups-grid');
-      grid.innerHTML = groups.map((group, index) => `
-        <div class="group-item" data-group="${group}">
-          <input type="checkbox" id="group-${index}" value="${group}">
-          <label for="group-${index}">${group}</label>
-        </div>
-      `).join('');
-      
-      grid.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-          const item = e.target.closest('.group-item');
-          item.classList.toggle('selected', e.target.checked);
-        });
-      });
-    }
-    
-    function renderStudentsList() {
-      const list = document.getElementById('students-list');
-      list.innerHTML = `
-        <h4 style="margin: 20px 0 12px 0; color: #374151;">Estudiantes Registrados (${students.length})</h4>
-        <div style="max-height: 300px; overflow-y: auto;">
-          ${students.map(student => `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px;">
-              <span style="font-weight: 500;">${student}</span>
-              <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="removeStudent('${student}')">Eliminar</button>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
-    
-    function renderGroupsList() {
-      const list = document.getElementById('groups-list');
-      list.innerHTML = `
-        <h4 style="margin: 20px 0 12px 0; color: #374151;">Grupos Registrados (${groups.length})</h4>
-        <div style="max-height: 300px; overflow-y: auto;">
-          ${groups.map(group => `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f0fdf4; border-radius: 8px; margin-bottom: 8px;">
-              <span style="font-weight: 500;">${group}</span>
-              <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="removeGroup('${group}')">Eliminar</button>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
-    
-    function addStudent() {
-      const input = document.getElementById('new-student');
-      const name = input.value.trim();
-      
-      if (!name) {
-        showToast('Por favor ingresa un nombre', 'error');
-        return;
-      }
-      
-      if (students.includes(name)) {
-        showToast('Este estudiante ya existe', 'error');
-        return;
-      }
-      
-      students.push(name);
-      input.value = '';
-      loadStudentsAndGroups();
-      showToast('Estudiante agregado exitosamente', 'success');
-    }
-    
-    function addGroup() {
-      const input = document.getElementById('new-group');
-      const name = input.value.trim();
-      
-      if (!name) {
-        showToast('Por favor ingresa un nombre', 'error');
-        return;
-      }
-      
-      if (groups.includes(name)) {
-        showToast('Este grupo ya existe', 'error');
-        return;
-      }
-      
-      groups.push(name);
-      input.value = '';
-      loadStudentsAndGroups();
-      showToast('Grupo agregado exitosamente', 'success');
-    }
-    
-    function removeStudent(name) {
-      students = students.filter(s => s !== name);
-      loadStudentsAndGroups();
-      showToast('Estudiante eliminado', 'success');
-    }
-    
-    function removeGroup(name) {
-      groups = groups.filter(g => g !== name);
-      loadStudentsAndGroups();
-      showToast('Grupo eliminado', 'success');
-    }
-    
-    function getAssignmentStatus(assignment) {
-      const dueDate = new Date(assignment.dueDate);
-      const now = new Date();
-      
-      if (dueDate < now) {
-        return 'overdue';
-      } else if (dueDate - now < 24 * 60 * 60 * 1000) {
-        return 'pending';
-      } else {
-        return 'active';
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          alert('✅ ' + result.message);
+          cerrarModal();
+
+          // Opcional: mostrar en la tabla sin recargar
+          const tbody = document.getElementById('tablaEvaluaciones');
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${nombre}</td>
+            <td>${descripcion}</td>
+            <td>${fecha}</td>
+            <td>${tipo}</td>
+            <td>Grupo ${grupo_id}</td>
+          `;
+          tbody.appendChild(row);
+        } else {
+          alert('⚠️ ' + result.message);
+        }
+      } catch (error) {
+        console.error(error);
+        alert('❌ Error al conectar con el servidor.');
       }
     }
-    
-    function getStatusText(status) {
-      switch (status) {
-        case 'active': return 'Activo';
-        case 'pending': return 'Próximo';
-        case 'overdue': return 'Vencido';
-        default: return 'Activo';
-      }
-    }
-    
-    function filterAssignments() {
-      const statusFilter = document.getElementById('status-filter').value;
-      const searchFilter = document.getElementById('search-filter').value.toLowerCase();
-      
-      return assignments.filter(assignment => {
-        const matchesStatus = statusFilter === 'all' || getAssignmentStatus(assignment) === statusFilter;
-        const matchesSearch = assignment.evaluationTitle.toLowerCase().includes(searchFilter) ||
-                             assignment.description.toLowerCase().includes(searchFilter);
-        
-        return matchesStatus && matchesSearch;
-      });
-    }
-    
-    function renderAssignments() {
-      const container = document.getElementById('assignments-container');
-      const filteredAssignments = filterAssignments();
-      
-      if (filteredAssignments.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <h3>No hay asignaciones</h3>
-            <p>Comienza creando tu primera asignación de evaluación para organizar el trabajo de tus estudiantes</p>
-            <button class="btn btn-primary" onclick="openAssignmentModal()">Crear Primera Asignación</button>
-          </div>
-        `;
-        return;
-      }
-      
-      container.innerHTML = `<div class="assignments-grid">${filteredAssignments.map(assignment => {
-        const status = getAssignmentStatus(assignment);
-        const dueDate = new Date(assignment.dueDate);
-        const assignedStudents = assignment.assignedStudents ? JSON.parse(assignment.assignedStudents) : [];
-        const assignedGroups = assignment.assignedGroups ? JSON.parse(assignment.assignedGroups) : [];
-        
-        return `
-          <div class="assignment-card ${status}" data-id="${assignment.id}">
-            <div class="assignment-header">
-              <h3 class="assignment-title">${assignment.evaluationTitle}</h3>
-              <span class="status-badge ${status}">${getStatusText(status)}</span>
-            </div>
-            
-            <p class="assignment-description">${assignment.description}</p>
-            
-            <div class="assignment-meta">
-              <div class="meta-item">
-                <span class="meta-label">Fecha de Entrega</span>
-                <span class="meta-value">${dueDate.toLocaleDateString('es-ES')} ${dueDate.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">Puntuación Máxima</span>
-                <span class="meta-value">${assignment.maxScore} puntos</span>
-              </div>
-            </div>
-            
-            <div class="assigned-to">
-              <h4>👥 Estudiantes Asignados (${assignedStudents.length})</h4>
-              <div class="assigned-students">
-                ${assignedStudents.slice(0, 5).map(student => `<span class="student-tag">${student}</span>`).join('')}
-                ${assignedStudents.length > 5 ? `<span class="student-tag">+${assignedStudents.length - 5} más</span>` : ''}
-              </div>
-              
-              <h4 style="margin-top: 12px;">🏫 Grupos Asignados (${assignedGroups.length})</h4>
-              <div class="assigned-groups">
-                ${assignedGroups.map(group => `<span class="group-tag">${group}</span>`).join('')}
-              </div>
-            </div>
-            
-            <div class="card-actions">
-              <button class="btn btn-primary view-btn" data-id="${assignment.id}">Ver Detalles</button>
-              <button class="btn btn-warning edit-btn" data-id="${assignment.id}">Editar</button>
-              <button class="btn btn-danger delete-btn" data-id="${assignment.id}">Eliminar</button>
-            </div>
-          </div>
-        `;
-      }).join('')}</div>`;
-      
-      // Agregar event listeners
-      document.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.target.dataset.id;
-          viewAssignmentDetails(id);
-        });
-      });
-      
-      document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.target.dataset.id;
-          editAssignment(id);
-        });
-      });
-      
-      document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.target.dataset.id;
-          deleteAssignment(id);
-        });
-      });
-    }
-    
-    function viewAssignmentDetails(id) {
-      const assignment = assignments.find(a => a.id === id);
-      if (!assignment) return;
-      
-      const assignedStudents = assignment.assignedStudents ? JSON.parse(assignment.assignedStudents) : [];
-      const assignedGroups = assignment.assignedGroups ? JSON.parse(assignment.assignedGroups) : [];
-      const dueDate = new Date(assignment.dueDate);
-      
-      showToast(`
-        📋 ${assignment.evaluationTitle}
-        
-        📅 Entrega: ${dueDate.toLocaleDateString('es-ES')} ${dueDate.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}
-        
-        👥 Estudiantes: ${assignedStudents.join(', ')}
-        🏫 Grupos: ${assignedGroups.join(', ')}
-        
-        📝 Instrucciones: ${assignment.instructions || 'Sin instrucciones especiales'}
-      `, 'success');
-    }
-    
-    function editAssignment(id) {
-      const assignment = assignments.find(a => a.id === id);
-      if (!assignment) return;
-      
-      // Llenar el formulario con los datos existentes
-      document.getElementById('eval-title').value = assignment.evaluationTitle;
-      document.getElementById('eval-description').value = assignment.description;
-      document.getElementById('eval-due-date').value = new Date(assignment.dueDate).toISOString().slice(0, 16);
-      document.getElementById('eval-max-score').value = assignment.maxScore;
-      document.getElementById('eval-instructions').value = assignment.instructions || '';
-      
-      // Marcar estudiantes y grupos asignados
-      const assignedStudents = assignment.assignedStudents ? JSON.parse(assignment.assignedStudents) : [];
-      const assignedGroups = assignment.assignedGroups ? JSON.parse(assignment.assignedGroups) : [];
-      
-      document.querySelectorAll('#students-grid input[type="checkbox"]').forEach(checkbox => {
-        checkbox.checked = assignedStudents.includes(checkbox.value);
-        checkbox.closest('.student-item').classList.toggle('selected', checkbox.checked);
-      });
-      
-      document.querySelectorAll('#groups-grid input[type="checkbox"]').forEach(checkbox => {
-        checkbox.checked = assignedGroups.includes(checkbox.value);
-        checkbox.closest('.group-item').classList.toggle('selected', checkbox.checked);
-      });
-      
-      // Cambiar el título del modal y guardar el ID para edición
-      document.getElementById('modal-title').textContent = '✏️ Editar Asignación';
-      document.getElementById('submit-assignment-btn').textContent = 'Actualizar Asignación';
-      document.getElementById('assignment-form').dataset.editId = id;
-      
-      document.getElementById('assignment-modal').classList.add('active');
-    }
-    
-    async function deleteAssignment(id) {
-      const assignment = assignments.find(a => a.id === id);
-      if (!assignment) return;
-      
-      const card = document.querySelector(`[data-id="${id}"]`);
-      const deleteBtn = card.querySelector('.delete-btn');
-      
-      if (deleteBtn.textContent === 'Eliminar') {
-        deleteBtn.textContent = '¿Confirmar?';
-        deleteBtn.classList.remove('btn-danger');
-        deleteBtn.classList.add('btn-secondary');
-        
-        setTimeout(() => {
-          if (deleteBtn.textContent === '¿Confirmar?') {
-            deleteBtn.textContent = 'Eliminar';
-            deleteBtn.classList.remove('btn-secondary');
-            deleteBtn.classList.add('btn-danger');
-          }
-        }, 3000);
-        return;
-      }
-      
-      deleteBtn.disabled = true;
-      deleteBtn.innerHTML = '<span class="spinner"></span>Eliminando...';
-      
-      const result = await window.dataSdk.delete(assignment);
-      
-      if (result.isOk) {
-        showToast('Asignación eliminada exitosamente', 'success');
-      } else {
-        showToast('Error al eliminar la asignación', 'error');
-        deleteBtn.disabled = false;
-        deleteBtn.textContent = 'Eliminar';
-      }
-    }
-    
-    function openAssignmentModal() {
-      document.getElementById('assignment-form').reset();
-      document.getElementById('modal-title').textContent = '📝 Nueva Asignación de Evaluación';
-      document.getElementById('submit-assignment-btn').textContent = 'Crear Asignación';
-      delete document.getElementById('assignment-form').dataset.editId;
-      
-      // Limpiar selecciones
-      document.querySelectorAll('.student-item, .group-item').forEach(item => {
-        item.classList.remove('selected');
-        item.querySelector('input[type="checkbox"]').checked = false;
-      });
-      
-      // Establecer fecha por defecto (una semana desde hoy)
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      document.getElementById('eval-due-date').value = nextWeek.toISOString().slice(0, 16);
-      
-      document.getElementById('assignment-modal').classList.add('active');
-    }
-    
-    function showToast(message, type = 'success') {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.className = `toast ${type} show`;
-      
-      setTimeout(() => {
-        toast.classList.remove('show');
-      }, 4000);
-    }
-    
-    // Event Listeners
-    document.getElementById('create-assignment-btn').addEventListener('click', openAssignmentModal);
-    
-    document.getElementById('manage-students-btn').addEventListener('click', () => {
-      document.getElementById('students-modal').classList.add('active');
-    });
-    
-    document.getElementById('manage-groups-btn').addEventListener('click', () => {
-      document.getElementById('groups-modal').classList.add('active');
-    });
-    
-    document.getElementById('cancel-assignment-btn').addEventListener('click', () => {
-      document.getElementById('assignment-modal').classList.remove('active');
-    });
-    
-    document.getElementById('close-students-btn').addEventListener('click', () => {
-      document.getElementById('students-modal').classList.remove('active');
-    });
-    
-    document.getElementById('close-groups-btn').addEventListener('click', () => {
-      document.getElementById('groups-modal').classList.remove('active');
-    });
-    
-    document.getElementById('add-student-btn').addEventListener('click', addStudent);
-    document.getElementById('add-group-btn').addEventListener('click', addGroup);
-    
-    document.getElementById('new-student').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') addStudent();
-    });
-    
-    document.getElementById('new-group').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') addGroup();
-    });
-    
-    document.getElementById('status-filter').addEventListener('change', renderAssignments);
-    document.getElementById('search-filter').addEventListener('input', renderAssignments);
-    
-    document.getElementById('assignment-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      if (assignments.length >= 999 && !e.target.dataset.editId) {
-        showToast('Límite máximo de 999 asignaciones alcanzado', 'error');
-        return;
-      }
-      
-      const title = document.getElementById('eval-title').value.trim();
-      const description = document.getElementById('eval-description').value.trim();
-      const dueDate = document.getElementById('eval-due-date').value;
-      const maxScore = parseInt(document.getElementById('eval-max-score').value);
-      const instructions = document.getElementById('eval-instructions').value.trim();
-      
-      const selectedStudents = Array.from(document.querySelectorAll('#students-grid input[type="checkbox"]:checked')).map(cb => cb.value);
-      const selectedGroups = Array.from(document.querySelectorAll('#groups-grid input[type="checkbox"]:checked')).map(cb => cb.value);
-      
-      if (selectedStudents.length === 0 && selectedGroups.length === 0) {
-        showToast('Debes seleccionar al menos un estudiante o grupo', 'error');
-        return;
-      }
-      
-      const submitBtn = document.getElementById('submit-assignment-btn');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner"></span>Guardando...';
-      
-      const assignmentData = {
-        evaluationTitle: title,
-        description,
-        dueDate: new Date(dueDate).toISOString(),
-        maxScore,
-        instructions,
-        assignedStudents: JSON.stringify(selectedStudents),
-        assignedGroups: JSON.stringify(selectedGroups),
-        status: 'active'
-      };
-      
-      let result;
-      if (e.target.dataset.editId) {
-        // Editar asignación existente
-        const existingAssignment = assignments.find(a => a.id === e.target.dataset.editId);
-        result = await window.dataSdk.update({
-          ...existingAssignment,
-          ...assignmentData
-        });
-      } else {
-        // Crear nueva asignación
-        result = await window.dataSdk.create({
-          id: Date.now().toString(),
-          ...assignmentData,
-          createdAt: new Date().toISOString()
-        });
-      }
-      
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = e.target.dataset.editId ? 'Actualizar Asignación' : 'Crear Asignación';
-      
-      if (result.isOk) {
-        showToast(e.target.dataset.editId ? 'Asignación actualizada exitosamente' : 'Asignación creada exitosamente', 'success');
-        document.getElementById('assignment-modal').classList.remove('active');
-      } else {
-        showToast('Error al guardar la asignación', 'error');
-      }
-    });
-    
-    async function onConfigChange(config) {
-      document.getElementById('app-title').textContent = config.app_title || defaultConfig.app_title;
-      document.getElementById('welcome-message').textContent = config.welcome_message || defaultConfig.welcome_message;
-      
-      const primaryColor = config.primary_color || defaultConfig.primary_color;
-      const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
-      const textColor = config.text_color || defaultConfig.text_color;
-      const successColor = config.success_color || defaultConfig.success_color;
-      const dangerColor = config.danger_color || defaultConfig.danger_color;
-      
-      document.body.style.background = `linear-gradient(135deg, ${primaryColor} 0%, #7c3aed 100%)`;
-      
-      document.querySelectorAll('.btn-primary').forEach(btn => {
-        btn.style.background = primaryColor;
-      });
-      
-      document.querySelectorAll('.btn-success').forEach(btn => {
-        btn.style.background = successColor;
-      });
-      
-      document.querySelectorAll('.btn-danger').forEach(btn => {
-        btn.style.background = dangerColor;
-      });
-      
-      document.querySelectorAll('.header, .actions-bar, .assignment-card, .modal-content, .empty-state, .filter-bar').forEach(el => {
-        el.style.background = secondaryColor;
-      });
-      
-      document.querySelectorAll('h1, h2, h3, .assignment-title').forEach(el => {
-        el.style.color = textColor;
-      });
-    }
-    
-    if (window.elementSdk) {
-      window.elementSdk.init({
-        defaultConfig,
-        onConfigChange,
-        mapToCapabilities: (config) => ({
-          recolorables: [
-            {
-              get: () => config.primary_color || defaultConfig.primary_color,
-              set: (value) => {
-                config.primary_color = value;
-                window.elementSdk.setConfig({ primary_color: value });
-              }
-            },
-            {
-              get: () => config.secondary_color || defaultConfig.secondary_color,
-              set: (value) => {
-                config.secondary_color = value;
-                window.elementSdk.setConfig({ secondary_color: value });
-              }
-            },
-            {
-              get: () => config.text_color || defaultConfig.text_color,
-              set: (value) => {
-                config.text_color = value;
-                window.elementSdk.setConfig({ text_color: value });
-              }
-            },
-            {
-              get: () => config.success_color || defaultConfig.success_color,
-              set: (value) => {
-                config.success_color = value;
-                window.elementSdk.setConfig({ success_color: value });
-              }
-            },
-            {
-              get: () => config.danger_color || defaultConfig.danger_color,
-              set: (value) => {
-                config.danger_color = value;
-                window.elementSdk.setConfig({ danger_color: value });
-              }
-            }
-          ],
-          borderables: [],
-          fontEditable: undefined,
-          fontSizeable: undefined
-        }),
-        mapToEditPanelValues: (config) => new Map([
-          ["app_title", config.app_title || defaultConfig.app_title],
-          ["welcome_message", config.welcome_message || defaultConfig.welcome_message]
-        ])
-      });
-    }
-    
-    initializeApp();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99ae548f06404871',t:'MTc2MjUzNDIzMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>

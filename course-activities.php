@@ -1,3 +1,186 @@
+<?php
+session_start();
+
+// Suponiendo que el ID del estudiante se almacena en la sesión
+$studentId = $_SESSION['student_id'] ?? 1; // Usar ID 1 para demo si no hay sesión
+
+// ============================================
+// LÓGICA DE CONEXIÓN Y CONSULTA
+// ============================================
+
+// Configuración de la base de datos
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "hootlearn";
+
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+if ($conn->connect_error) {
+    die("Error de conexión a la base de datos: " . $conn->connect_error);
+}
+$conn->set_charset("utf8mb4");
+
+// Obtener ID del curso de la URL
+$courseId = $_GET['courseId'] ?? null;
+
+if (!$courseId) {
+    header("Location: my-courses.html");
+    exit();
+}
+
+// 1. OBTENER DATOS DEL CURSO
+$course_stmt = $conn->prepare("
+    SELECT 
+        c.NombreCurso, 
+        c.Icono, 
+        CONCAT(p.ProfNombre, ' ', p.ProfApellido) AS Instructor,
+        i.Progreso,
+        c.TotalLecciones
+    FROM cursos c
+    INNER JOIN profesorregistro p ON c.ProfID = p.ProfID
+    INNER JOIN inscripciones i ON c.CursoID = i.CursoID AND i.EstID = ?
+    WHERE c.CursoID = ?
+");
+$course_stmt->bind_param("ii", $studentId, $courseId);
+$course_stmt->execute();
+$course_result = $course_stmt->get_result();
+$currentCourseData = $course_result->fetch_assoc();
+$course_stmt->close();
+
+if (!$currentCourseData) {
+    echo "<script>alert('Curso no encontrado o no estás inscrito.'); window.location.href='my-courses.html';</script>";
+    exit();
+}
+
+// 2. OBTENER ACTIVIDADES Y SU ESTADO PARA EL ESTUDIANTE (Usando la vista_actividades_pendientes)
+// Modificación de la consulta SQL en course-activities.php (alrededor de la línea 56)
+
+$activities_stmt = $conn->prepare("
+    SELECT 
+        a.ActividadID,
+        a.Titulo,
+        a.Tipo,
+        a.Descripcion,
+        a.Puntos,
+        a.FechaVencimiento AS dueDate,
+        a.Requisitos,
+        a.ArchivoRequerido,
+        e.Estado AS status_entrega, -- Renombrar para evitar conflicto
+        e.Calificacion AS grade,
+        e.FechaEntrega AS submittedDate,
+        e.Retroalimentacion AS feedback,
+        e.Comentarios AS submissionComments,
+        e.EntregaTardia -- Nuevo campo
+    FROM actividades a
+    INNER JOIN inscripciones i ON a.CursoID = i.CursoID
+    LEFT JOIN entregas e ON a.ActividadID = e.ActividadID AND i.EstID = e.EstID
+    WHERE i.CursoID = ? AND i.EstID = ? AND a.Activo = TRUE
+    ORDER BY a.FechaVencimiento ASC
+");
+$activities_stmt->bind_param("ii", $courseId, $studentId);
+$activities_stmt->execute();
+$activities_result = $activities_stmt->get_result();
+$activities = [];
+
+while ($row = $activities_result->fetch_assoc()) {
+    
+    // --- NUEVAS VARIABLES DE ESTADO BASADAS EN LA CONSULTA ---
+    $statusEntregaBD = $row['status_entrega']; // Estado de la tabla 'entregas' ('pendiente', 'calificando', 'calificado')
+    $isSubmitted = !empty($row['submittedDate']);
+    $isGraded = $row['grade'] !== null;
+    $EntregaTardia = $row['EntregaTardia'];
+
+    // 1. Determinar el estado final para JavaScript ('status')
+    $status = 'pending'; // Estado por defecto
+    
+    if ($isSubmitted) {
+        // Hay una entrega registrada, determinar si está calificada
+        if ($isGraded) {
+            $status = 'completed'; // Calificada
+        } else {
+            $status = 'grading'; // Entregada, pero no calificada aún
+        }
+    }
+
+    // 2. Verificar si está vencida (solo si NO ha sido entregada)
+    $dueDate = new DateTime($row['dueDate']);
+    $today = new DateTime();
+
+    if (!$isSubmitted && $dueDate < $today) {
+        $status = 'overdue'; // No entregada y fuera de fecha
+    }
+
+    // 3. Crear el array de actividad para JS
+    $activities[] = [
+        'ActividadID' => $row['ActividadID'],
+        'Titulo' => $row['Titulo'],
+        'Tipo' => $row['Tipo'],
+        'Descripcion' => $row['Descripcion'],
+        'Puntos' => $row['Puntos'],
+        'dueDate' => $row['dueDate'],
+        'status' => $status, // Estado final para JS
+        'isOverdue' => ($status === 'overdue'),
+        'grade' => $row['grade'],
+        'submittedDate' => $row['submittedDate'],
+        'feedback' => $row['feedback'],
+        'submissionComments' => $row['submissionComments'],
+        'EntregaTardia' => $EntregaTardia,
+        
+        // Convertir requisitos de texto a un array de JS (separado por saltos de línea)
+        'requirements' => $row['Requisitos'] ? explode("\n", $row['Requisitos']) : [],
+        
+        // Simulación de datos de archivo entregado
+        'submittedFile' => $row['submittedDate'] ? [
+            'name' => 'entrega-' . $row['ActividadID'] . '.pdf',
+            'size' => '3.5 MB',
+            'type' => 'PDF',
+            'ruta' => 'uploads/entrega_ejemplo.pdf'
+        ] : null,
+    ];
+}
+$activities_stmt->close();
+
+// 3. OBTENER ESTADÍSTICAS DEL CURSO PARA EL HEADER
+$totalActivities = count($activities);
+$completedActivities = 0;
+$pendingActivities = 0;
+$overdueActivities = 0;
+$gradingActivities = 0;
+$totalPoints = 0;
+
+foreach ($activities as $activity) {
+    $totalPoints += $activity['Puntos'];
+    if ($activity['status'] === 'completed') {
+        $completedActivities++;
+    } elseif ($activity['status'] === 'grading') {
+        $gradingActivities++;
+    } elseif ($activity['status'] === 'overdue') {
+        $overdueActivities++;
+    } elseif ($activity['status'] === 'pending') {
+        $pendingActivities++;
+    }
+}
+
+$courseStats = [
+    'Instructor' => $currentCourseData['Instructor'],
+    'TotalActivities' => $totalActivities,
+    'CompletedActivities' => $completedActivities,
+    'GradingActivities' => $gradingActivities,
+    'PendingActivities' => $pendingActivities,
+    'OverdueActivities' => $overdueActivities,
+    'TotalPoints' => $totalPoints,
+    'Progress' => $currentCourseData['Progreso'] // Desde la tabla inscripciones
+];
+
+// Codificar datos PHP para ser usados en JavaScript
+$currentCourseJSON = json_encode($currentCourseData);
+$activitiesJSON = json_encode($activities);
+$courseStatsJSON = json_encode($courseStats);
+
+$conn->close();
+
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -5,6 +188,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Actividades del Curso - Hoot & Learn</title>
     <style>
+        /* === (Mantener todo el CSS original de course-activities.html aquí) === */
         body {
             box-sizing: border-box;
             margin: 0;
@@ -920,10 +1104,8 @@
     </style>
 </head>
 <body>
-    <!-- === FONDO ANIMADO === -->
     <div class="animated-bg"></div>
 
-    <!-- === HEADER === -->
     <header class="header">
         <div class="header-content">
             <div class="logo">Hoot & Learn</div>
@@ -935,20 +1117,16 @@
         </div>
     </header>
 
-    <!-- === MAIN CONTENT === -->
     <main class="main-content">
-        <!-- === COURSE HEADER === -->
         <section class="course-header">
             <h1 class="course-title" id="courseTitle">
-                <span id="courseIcon">📚</span>
-                <span id="courseName">Cargando curso...</span>
+                <span id="courseIcon"><?php echo htmlspecialchars($currentCourseData['Icono'] ?? '📚'); ?></span>
+                <span id="courseName"><?php echo htmlspecialchars($currentCourseData['NombreCurso'] ?? 'Cargando curso...'); ?></span>
             </h1>
             <div class="course-stats" id="courseStats">
-                <!-- Se llenará dinámicamente -->
-            </div>
+                </div>
         </section>
 
-        <!-- === ACTIVITIES SECTION === -->
         <section class="activities-section">
             <h2 class="section-title">
                 <span>📝</span>
@@ -956,27 +1134,28 @@
             </h2>
             
             <div class="activities-filter">
-                <button class="filter-btn active" onclick="filterActivities('all')">
+                <button class="filter-btn active" onclick="filterActivities('all', this)">
                     Todas
                 </button>
-                <button class="filter-btn" onclick="filterActivities('pending')">
+                <button class="filter-btn" onclick="filterActivities('pending', this)">
                     Pendientes
                 </button>
-                <button class="filter-btn" onclick="filterActivities('completed')">
+                <button class="filter-btn" onclick="filterActivities('completed', this)">
                     Completadas
                 </button>
-                <button class="filter-btn" onclick="filterActivities('overdue')">
+                <button class="filter-btn" onclick="filterActivities('overdue', this)">
                     Vencidas
+                </button>
+                <button class="filter-btn" onclick="filterActivities('grading', this)">
+                    En Calificación
                 </button>
             </div>
 
             <div class="activities-grid" id="activitiesGrid">
-                <!-- Se llenará dinámicamente -->
-            </div>
+                </div>
         </section>
     </main>
 
-    <!-- === MODAL DE DETALLES === -->
     <div class="details-modal" id="detailsModal">
         <div class="details-content">
             <div class="details-header">
@@ -993,8 +1172,7 @@
                     Información General
                 </div>
                 <div class="details-info-grid" id="detailsInfoGrid">
-                    <!-- Se llenará dinámicamente -->
-                </div>
+                    </div>
             </div>
 
             <div class="details-section">
@@ -1003,8 +1181,7 @@
                     Descripción
                 </div>
                 <div class="details-description" id="detailsDescription">
-                    <!-- Se llenará dinámicamente -->
-                </div>
+                    </div>
             </div>
 
             <div class="details-section">
@@ -1014,14 +1191,12 @@
                 </div>
                 <div class="details-requirements">
                     <ul class="requirements-list" id="detailsRequirements">
-                        <!-- Se llenará dinámicamente -->
-                    </ul>
+                        </ul>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- === MODAL DE VER ENTREGA === -->
     <div class="submission-modal" id="viewSubmissionModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1036,8 +1211,7 @@
                         Información de la Entrega
                     </div>
                     <div class="details-info-grid" id="submissionInfoGrid">
-                        <!-- Se llenará dinámicamente -->
-                    </div>
+                        </div>
                 </div>
 
                 <div class="details-section" id="submissionFileSection">
@@ -1046,8 +1220,7 @@
                         Archivo Entregado
                     </div>
                     <div class="submitted-file-info" id="submittedFileInfo">
-                        <!-- Se llenará dinámicamente -->
-                    </div>
+                        </div>
                 </div>
 
                 <div class="details-section" id="submissionCommentsSection">
@@ -1056,8 +1229,7 @@
                         Comentarios del Estudiante
                     </div>
                     <div class="submission-comments" id="submissionComments">
-                        <!-- Se llenará dinámicamente -->
-                    </div>
+                        </div>
                 </div>
 
                 <div class="details-section" id="gradeSection">
@@ -1066,14 +1238,12 @@
                         Calificación y Retroalimentación
                     </div>
                     <div class="grade-info" id="gradeInfo">
-                        <!-- Se llenará dinámicamente -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- === MODAL DE ENTREGA === -->
     <div class="submission-modal" id="submissionModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1101,7 +1271,7 @@
 
                 <div class="form-group">
                     <label class="form-label">💬 Comentarios (Opcional)</label>
-                    <textarea class="form-textarea" id="submissionComments" placeholder="Agrega cualquier comentario sobre tu entrega..."></textarea>
+                    <textarea class="form-textarea" id="submissionCommentsText" placeholder="Agrega cualquier comentario sobre tu entrega..."></textarea>
                 </div>
 
                 <div class="progress-container" id="progressContainer">
@@ -1131,270 +1301,84 @@
     </div>
 
     <script>
-        // === DATOS DE EJEMPLO EXPANDIDOS ===
-        const sampleCourses = [
-            {
-                id: 1,
-                title: "JavaScript Fundamentals",
-                instructor: "Prof. Ana García",
-                icon: "💻",
-                progress: 75,
-                lessons: 12,
-                completed: 9,
-                activities: [
-                    {
-                        id: 1,
-                        title: "Variables y Tipos de Datos",
-                        type: "assignment",
-                        description: "Crear un programa que demuestre el uso de diferentes tipos de variables en JavaScript.",
-                        dueDate: "2024-12-10",
-                        status: "completed",
-                        points: 100,
-                        submittedDate: "2024-12-08",
-                        grade: 95,
-                        feedback: "Excelente trabajo. Muy buena implementación de los conceptos.",
-                        submittedFile: {
-                            name: "variables_tipos_datos.js",
-                            size: "2.3 MB",
-                            type: "JavaScript"
-                        },
-                        submissionComments: "He incluido ejemplos adicionales de cada tipo de dato y comentarios detallados explicando cada concepto. También agregué casos de uso prácticos para demostrar la aplicación real de estos conceptos.",
-                        requirements: [
-                            "Declarar variables usando let, const y var",
-                            "Demostrar diferentes tipos de datos (string, number, boolean, array, object)",
-                            "Incluir comentarios explicativos en el código",
-                            "Subir archivo .js funcional"
-                        ]
-                    },
-                    {
-                        id: 2,
-                        title: "Funciones y Scope",
-                        type: "quiz",
-                        description: "Quiz sobre el funcionamiento de las funciones y el alcance de las variables.",
-                        dueDate: "2024-12-12",
-                        status: "grading",
-                        points: 50,
-                        submittedDate: "2024-12-11",
-                        isLateSubmission: false,
-                        submittedFile: {
-                            name: "quiz_funciones_scope.pdf",
-                            size: "1.1 MB",
-                            type: "PDF"
-                        },
-                        submissionComments: "Completé el quiz en 25 minutos. Las preguntas sobre closures fueron las más desafiantes pero creo que las respondí correctamente.",
-                        requirements: [
-                            "Completar todas las preguntas del quiz",
-                            "Tiempo límite: 30 minutos",
-                            "Solo se permite un intento",
-                            "Calificación mínima para aprobar: 70%"
-                        ]
-                    },
-                    {
-                        id: 3,
-                        title: "Proyecto Final - Calculadora",
-                        type: "project",
-                        description: "Desarrollar una calculadora funcional usando HTML, CSS y JavaScript puro.",
-                        dueDate: "2024-12-15",
-                        status: "pending",
-                        points: 200,
-                        requirements: [
-                            "Interfaz HTML con botones para números y operaciones",
-                            "Estilos CSS responsivos y atractivos",
-                            "Funcionalidad JavaScript para todas las operaciones básicas (+, -, *, /)",
-                            "Manejo de errores (división por cero, etc.)",
-                            "Código limpio y comentado",
-                            "Subir archivos HTML, CSS y JS en un ZIP"
-                        ]
-                    },
-                    {
-                        id: 4,
-                        title: "Arrays y Objetos",
-                        type: "assignment",
-                        description: "Ejercicios prácticos sobre manipulación de arrays y objetos en JavaScript.",
-                        dueDate: "2024-12-08",
-                        status: "overdue",
-                        points: 75,
-                        requirements: [
-                            "Resolver 10 ejercicios de manipulación de arrays",
-                            "Crear y manipular objetos complejos",
-                            "Usar métodos como map, filter, reduce",
-                            "Documentar cada solución con comentarios",
-                            "Subir archivo .js con todas las soluciones"
-                        ]
-                    },
-                    {
-                        id: 5,
-                        title: "DOM Manipulation",
-                        type: "assignment",
-                        description: "Crear una página interactiva que modifique elementos del DOM dinámicamente.",
-                        dueDate: "2024-12-20",
-                        status: "pending",
-                        points: 150,
-                        requirements: [
-                            "Página HTML con al menos 5 elementos interactivos",
-                            "Usar addEventListener para manejar eventos",
-                            "Modificar contenido, estilos y estructura del DOM",
-                            "Incluir animaciones CSS activadas por JavaScript",
-                            "Código validado y funcional en diferentes navegadores"
-                        ]
-                    }
-                ]
-            },
-            {
-                id: 2,
-                title: "Diseño UI/UX",
-                instructor: "Prof. Carlos López",
-                icon: "🎨",
-                progress: 45,
-                lessons: 15,
-                completed: 7,
-                activities: [
-                    {
-                        id: 6,
-                        title: "Wireframes de Aplicación Móvil",
-                        type: "project",
-                        description: "Diseñar wireframes completos para una aplicación de delivery de comida.",
-                        dueDate: "2024-12-12",
-                        status: "pending",
-                        points: 100
-                    },
-                    {
-                        id: 7,
-                        title: "Principios de Diseño",
-                        type: "quiz",
-                        description: "Evaluación sobre los principios fundamentales del diseño UI/UX.",
-                        dueDate: "2024-12-18",
-                        status: "pending",
-                        points: 50
-                    }
-                ]
-            },
-            {
-                id: 3,
-                title: "Python Básico",
-                instructor: "Prof. María Rodríguez",
-                icon: "🐍",
-                progress: 90,
-                lessons: 10,
-                completed: 9,
-                activities: [
-                    {
-                        id: 8,
-                        title: "Estructuras de Control",
-                        type: "assignment",
-                        description: "Implementar algoritmos usando if, for y while en Python.",
-                        dueDate: "2024-12-14",
-                        status: "pending",
-                        points: 80
-                    }
-                ]
-            }
-        ];
-
-        let currentCourse = null;
+        // === DATOS PROVENIENTES DE PHP ===
+        const currentCourseData = <?php echo $currentCourseJSON; ?>;
+        const activities = <?php echo $activitiesJSON; ?>;
+        const courseStats = <?php echo $courseStatsJSON; ?>;
+        const studentId = <?php echo $studentId; ?>;
+        const courseId = <?php echo $courseId; ?>;
+        
+        let currentActivity = null;
         let currentFilter = 'all';
 
         // === INICIALIZACIÓN ===
         document.addEventListener('DOMContentLoaded', function() {
-            loadCourseFromURL();
+            loadCourseHeader();
+            loadActivities();
             setupModalEvents();
         });
 
-        // === CARGAR CURSO DESDE URL ===
-        function loadCourseFromURL() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const courseId = urlParams.get('courseId');
-            const courseName = urlParams.get('courseName');
-
-            if (!courseId) {
-                window.location.href = 'my-courses.html';
-                return;
-            }
-
-            currentCourse = sampleCourses.find(course => course.id == courseId);
-
-            if (!currentCourse) {
-                showError('Curso no encontrado');
-                return;
-            }
-
-            loadCourseHeader();
-            loadActivities();
-        }
-
         // === CARGAR HEADER DEL CURSO ===
         function loadCourseHeader() {
-            if (!currentCourse) return;
+            const stats = courseStats;
 
-            document.getElementById('courseIcon').textContent = currentCourse.icon;
-            document.getElementById('courseName').textContent = currentCourse.title;
-            document.title = `${currentCourse.title} - Actividades - Hoot & Learn`;
+            document.getElementById('courseIcon').textContent = currentCourseData.Icono;
+            document.getElementById('courseName').textContent = currentCourseData.NombreCurso;
+            document.title = `${currentCourseData.NombreCurso} - Actividades - Hoot & Learn`;
 
-            const completedActivities = currentCourse.activities.filter(a => a.status === 'completed').length;
-            const gradingActivities = currentCourse.activities.filter(a => a.status === 'grading').length;
-            const totalActivities = currentCourse.activities.length;
-            const pendingActivities = currentCourse.activities.filter(a => a.status === 'pending').length;
-            const overdueActivities = currentCourse.activities.filter(a => a.status === 'overdue').length;
+            const gradingHtml = stats.GradingActivities > 0 ? `
+                <div class="stat-item">
+                    <span>🔍</span>
+                    <span>${stats.GradingActivities} en calificación</span>
+                </div>
+            ` : '';
+
+            const overdueHtml = stats.OverdueActivities > 0 ? `
+                <div class="stat-item">
+                    <span>⚠️</span>
+                    <span>${stats.OverdueActivities} vencidas</span>
+                </div>
+            ` : '';
 
             document.getElementById('courseStats').innerHTML = `
                 <div class="stat-item">
                     <span>👨‍🏫</span>
-                    <span>${currentCourse.instructor}</span>
+                    <span>${stats.Instructor}</span>
                 </div>
                 <div class="stat-item">
                     <span>📊</span>
-                    <span>${completedActivities}/${totalActivities} completadas</span>
+                    <span>${stats.CompletedActivities}/${stats.TotalActivities} completadas</span>
                 </div>
                 <div class="stat-item">
                     <span>⏳</span>
-                    <span>${pendingActivities} pendientes</span>
+                    <span>${stats.PendingActivities} pendientes</span>
                 </div>
-                ${gradingActivities > 0 ? `
-                <div class="stat-item">
-                    <span>🔍</span>
-                    <span>${gradingActivities} en calificación</span>
-                </div>
-                ` : ''}
-                ${overdueActivities > 0 ? `
-                <div class="stat-item">
-                    <span>⚠️</span>
-                    <span>${overdueActivities} vencidas</span>
-                </div>
-                ` : ''}
+                ${gradingHtml}
+                ${overdueHtml}
             `;
         }
 
         // === CARGAR ACTIVIDADES ===
         function loadActivities() {
-            if (!currentCourse) return;
-
             const activitiesGrid = document.getElementById('activitiesGrid');
-            let activities = currentCourse.activities;
+            let activitiesToDisplay = activities;
 
             if (currentFilter !== 'all') {
-                activities = activities.filter(activity => activity.status === currentFilter);
+                activitiesToDisplay = activities.filter(activity => activity.status === currentFilter);
             }
 
-            if (activities.length === 0) {
+            if (activitiesToDisplay.length === 0) {
                 activitiesGrid.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">📝</div>
-                        <h3>No hay actividades ${currentFilter === 'all' ? '' : currentFilter === 'pending' ? 'pendientes' : currentFilter === 'completed' ? 'completadas' : 'vencidas'}</h3>
+                        <h3>No hay actividades ${currentFilter === 'all' ? '' : currentFilter === 'pending' ? 'pendientes' : currentFilter === 'completed' ? 'completadas' : currentFilter === 'grading' ? 'en calificación' : 'vencidas'}</h3>
                         <p>Las actividades aparecerán aquí cuando estén disponibles.</p>
                     </div>
                 `;
                 return;
             }
 
-            activitiesGrid.innerHTML = activities.map(activity => {
-                const dueDate = new Date(activity.dueDate);
-                const today = new Date();
-                const isOverdue = activity.status === 'pending' && dueDate < today;
-                
-                if (isOverdue) {
-                    activity.status = 'overdue';
-                }
-
+            activitiesGrid.innerHTML = activitiesToDisplay.map(activity => {
                 const typeIcons = {
                     assignment: '📝',
                     project: '🚀',
@@ -1414,26 +1398,34 @@
                     overdue: 'Vencida',
                     grading: 'Pendiente de Calificación'
                 };
+                
+                // Determinar si la actividad está realmente vencida para el estado (isOverdue es de la BD)
+                const isOverdue = activity.isOverdue == 1;
+                
+                let cardClass = activity.status;
+                if (isOverdue && activity.status === 'pending') {
+                    cardClass = 'overdue';
+                }
 
                 return `
-                    <div class="activity-card ${activity.status}">
+                    <div class="activity-card ${cardClass}">
                         <div class="activity-header">
                             <div class="activity-info">
                                 <div class="activity-title">
-                                    ${typeIcons[activity.type]} ${activity.title}
-                                    <span class="activity-type ${activity.type}">${activity.type}</span>
-                                    ${activity.isLateSubmission ? '<span class="late-submission-badge">Entrega Tardía</span>' : ''}
+                                    ${typeIcons[activity.Tipo] || '📝'} ${activity.Titulo}
+                                    <span class="activity-type ${activity.Tipo}">${activity.Tipo}</span>
+                                    ${activity.EntregaTardia == 1 ? '<span class="late-submission-badge">Entrega Tardía</span>' : ''}
                                 </div>
                                 <div class="activity-status status-${activity.status}">
                                     ${statusIcons[activity.status]}
                                     ${statusTexts[activity.status]}
-                                    ${activity.grade ? ` (${activity.grade}/100)` : ''}
+                                    ${activity.grade ? ` (${Math.round(activity.grade)}/${activity.Puntos})` : ''}
                                 </div>
                             </div>
                         </div>
                         
                         <div class="activity-description">
-                            ${activity.description}
+                            ${activity.Descripcion}
                         </div>
                         
                         <div class="activity-details">
@@ -1444,7 +1436,7 @@
                                 </div>
                                 <div class="meta-item">
                                     <span>🎯</span>
-                                    <span>${activity.points} puntos</span>
+                                    <span>${activity.Puntos} puntos</span>
                                 </div>
                                 ${activity.submittedDate ? `
                                 <div class="meta-item">
@@ -1455,25 +1447,18 @@
                             </div>
                             
                             <div class="activity-actions">
-                                ${activity.status === 'completed' ? `
-                                    <button class="action-btn completed" onclick="viewSubmission(${activity.id})">
+                                ${activity.status === 'completed' || activity.status === 'grading' ? `
+                                    <button class="action-btn ${activity.status === 'completed' ? 'completed' : ''}" onclick="viewSubmission(${activity.ActividadID})">
                                         Ver Entrega
                                     </button>
-                                    <button class="action-btn secondary" onclick="viewDetails(${activity.id})">
-                                        Detalles
-                                    </button>
-                                ` : activity.status === 'grading' ? `
-                                    <button class="action-btn" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);" onclick="viewSubmission(${activity.id})">
-                                        Ver Entrega
-                                    </button>
-                                    <button class="action-btn secondary" onclick="viewDetails(${activity.id})">
+                                    <button class="action-btn secondary" onclick="viewDetails(${activity.ActividadID})">
                                         Detalles
                                     </button>
                                 ` : `
-                                    <button class="action-btn" onclick="startActivity(${activity.id})">
-                                        ${activity.status === 'overdue' ? 'Entregar Tarde' : 'Comenzar'}
+                                    <button class="action-btn" onclick="startActivity(${activity.ActividadID})">
+                                        ${isOverdue ? 'Entregar Tarde' : 'Comenzar'}
                                     </button>
-                                    <button class="action-btn secondary" onclick="viewDetails(${activity.id})">
+                                    <button class="action-btn secondary" onclick="viewDetails(${activity.ActividadID})">
                                         Detalles
                                     </button>
                                 `}
@@ -1485,37 +1470,43 @@
         }
 
         // === FILTRAR ACTIVIDADES ===
-        function filterActivities(filter) {
+        function filterActivities(filter, element) {
             currentFilter = filter;
             
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            element.classList.add('active');
             
             loadActivities();
         }
 
         // === ACCIONES DE ACTIVIDADES ===
         function startActivity(activityId) {
-            const activity = currentCourse.activities.find(a => a.id === activityId);
-            if (!activity) return;
+            currentActivity = activities.find(a => a.ActividadID === activityId);
+            if (!currentActivity) return;
             
-            document.getElementById('modalActivityTitle').textContent = `Entregar: ${activity.title}`;
+            document.getElementById('modalActivityTitle').textContent = `Entregar: ${currentActivity.Titulo}`;
+            
+            // Mostrar u ocultar el input de archivo
+            if (currentActivity.ArchivoRequerido == 1) {
+                document.getElementById('fileUploadSection').style.display = 'block';
+            } else {
+                document.getElementById('fileUploadSection').style.display = 'none';
+            }
+            
             document.getElementById('submissionModal').classList.add('active');
-            
             window.currentActivityId = activityId;
         }
 
         function viewDetails(activityId) {
-            const activity = currentCourse.activities.find(a => a.id === activityId);
+            const activity = activities.find(a => a.ActividadID === activityId);
             if (!activity) return;
             
-            // Llenar información del modal
-            document.getElementById('detailsActivityTitle').textContent = activity.title;
-            document.getElementById('detailsActivityType').textContent = `${activity.type.toUpperCase()} • ${activity.points} puntos`;
+            // Llenar información del modal (Detalles)
+            document.getElementById('detailsActivityTitle').textContent = activity.Titulo;
+            document.getElementById('detailsActivityType').textContent = `${activity.Tipo.toUpperCase()} • ${activity.Puntos} puntos`;
             
-            // Información general
             const statusTexts = {
                 completed: 'Completada',
                 pending: 'Pendiente',
@@ -1523,10 +1514,16 @@
                 grading: 'Pendiente de Calificación'
             };
             
+            // Calcular días restantes
             const dueDate = new Date(activity.dueDate);
             const today = new Date();
-            const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            const timeDiff = dueDate.getTime() - today.getTime();
+            const daysUntilDue = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
             
+            const timeStatus = activity.status === 'pending' || activity.status === 'overdue' 
+                ? (daysUntilDue > 0 ? `${daysUntilDue} días restantes` : 'Vencido') 
+                : (activity.submittedDate ? `Entregado el ${formatDate(activity.submittedDate)}` : 'N/A');
+
             document.getElementById('detailsInfoGrid').innerHTML = `
                 <div class="details-info-item">
                     <div class="details-info-label">Estado</div>
@@ -1538,35 +1535,27 @@
                 </div>
                 <div class="details-info-item">
                     <div class="details-info-label">Puntos</div>
-                    <div class="details-info-value">${activity.points} pts</div>
+                    <div class="details-info-value">${activity.Puntos} pts</div>
                 </div>
                 <div class="details-info-item">
-                    <div class="details-info-label">Tiempo Restante</div>
-                    <div class="details-info-value">${activity.status === 'pending' ? 
-                        (daysUntilDue > 0 ? `${daysUntilDue} días` : 'Vencido') : 
-                        activity.submittedDate ? `Entregado el ${formatDate(activity.submittedDate)}` : 'N/A'}</div>
+                    <div class="details-info-label">Tiempo</div>
+                    <div class="details-info-value">${timeStatus}</div>
                 </div>
                 ${activity.grade ? `
                 <div class="details-info-item">
                     <div class="details-info-label">Calificación</div>
-                    <div class="details-info-value">${activity.grade}/100</div>
-                </div>
-                ` : ''}
-                ${activity.isLateSubmission ? `
-                <div class="details-info-item">
-                    <div class="details-info-label">Tipo de Entrega</div>
-                    <div class="details-info-value" style="color: #ef4444;">Entrega Tardía</div>
+                    <div class="details-info-value">${Math.round(activity.grade)}/${activity.Puntos}</div>
                 </div>
                 ` : ''}
             `;
             
             // Descripción
-            document.getElementById('detailsDescription').textContent = activity.description;
+            document.getElementById('detailsDescription').textContent = activity.Descripcion;
             
             // Requisitos
             if (activity.requirements && activity.requirements.length > 0) {
                 document.getElementById('detailsRequirements').innerHTML = activity.requirements
-                    .map(req => `<li>${req}</li>`)
+                    .map(req => `<li>${req.trim()}</li>`)
                     .join('');
             } else {
                 document.getElementById('detailsRequirements').innerHTML = '<li>No hay requisitos específicos definidos</li>';
@@ -1581,22 +1570,19 @@
         }
 
         function viewSubmission(activityId) {
-            const activity = currentCourse.activities.find(a => a.id === activityId);
-            if (!activity) return;
+            const activity = activities.find(a => a.ActividadID === activityId);
+            if (!activity || !activity.submittedDate) return;
             
-            // Llenar título del modal
-            document.getElementById('viewSubmissionTitle').textContent = `Entrega: ${activity.title}`;
+            // Llenar información del modal (Ver Entrega)
+            document.getElementById('viewSubmissionTitle').textContent = `Entrega: ${activity.Titulo}`;
             
             // Información de la entrega
-            const statusTexts = {
-                completed: 'Completada y Calificada',
-                grading: 'Pendiente de Calificación'
-            };
-            
+            const isLate = activity.EntregaTardia == 1;
+
             document.getElementById('submissionInfoGrid').innerHTML = `
                 <div class="details-info-item">
                     <div class="details-info-label">Estado</div>
-                    <div class="details-info-value">${statusTexts[activity.status]}</div>
+                    <div class="details-info-value">${activity.status === 'completed' ? 'Calificada' : 'En Revisión'}</div>
                 </div>
                 <div class="details-info-item">
                     <div class="details-info-label">Fecha de Entrega</div>
@@ -1608,20 +1594,18 @@
                 </div>
                 <div class="details-info-item">
                     <div class="details-info-label">Tipo de Entrega</div>
-                    <div class="details-info-value" style="color: ${activity.isLateSubmission ? '#ef4444' : '#22c55e'};">
-                        ${activity.isLateSubmission ? 'Entrega Tardía' : 'A Tiempo'}
+                    <div class="details-info-value" style="color: ${isLate ? '#ef4444' : '#22c55e'};">
+                        ${isLate ? 'Entrega Tardía' : 'A Tiempo'}
                     </div>
                 </div>
             `;
             
             // Archivo entregado
+            const submissionFileSection = document.getElementById('submissionFileSection');
             if (activity.submittedFile) {
+                submissionFileSection.style.display = 'block';
                 const fileTypeIcons = {
-                    'JavaScript': '📄',
-                    'PDF': '📕',
-                    'Word': '📘',
-                    'ZIP': '📦',
-                    'Image': '🖼️'
+                    'PDF': '📕', 'DOC': '📘', 'DOCX': '📘', 'ZIP': '📦', 'JavaScript': '📄', 'Image': '🖼️'
                 };
                 
                 document.getElementById('submittedFileInfo').innerHTML = `
@@ -1630,38 +1614,33 @@
                         <div class="file-name">${activity.submittedFile.name}</div>
                         <div class="file-meta">Tamaño: ${activity.submittedFile.size} • Tipo: ${activity.submittedFile.type}</div>
                     </div>
-                    <button class="download-btn" onclick="downloadFile('${activity.submittedFile.name}')">
+                    <a href="${activity.submittedFile.ruta}" target="_blank" class="download-btn">
                         <span>⬇️</span>
                         Descargar
-                    </button>
+                    </a>
                 `;
             } else {
-                document.getElementById('submittedFileInfo').innerHTML = `
-                    <div style="text-align: center; color: #9ca3af; padding: 2rem;">
-                        <div style="font-size: 2rem; margin-bottom: 1rem;">📄</div>
-                        <div>No hay archivo disponible</div>
-                    </div>
-                `;
+                submissionFileSection.style.display = 'none';
             }
             
             // Comentarios del estudiante
+            const submissionCommentsDiv = document.getElementById('submissionComments');
             if (activity.submissionComments && activity.submissionComments.trim()) {
-                document.getElementById('submissionComments').innerHTML = `"${activity.submissionComments}"`;
+                submissionCommentsDiv.innerHTML = `"${activity.submissionComments}"`;
             } else {
-                document.getElementById('submissionComments').innerHTML = `
-                    <div class="no-comments">El estudiante no agregó comentarios adicionales.</div>
-                `;
+                submissionCommentsDiv.innerHTML = `<div class="no-comments">El estudiante no agregó comentarios adicionales.</div>`;
             }
             
             // Calificación y retroalimentación
+            const gradeInfo = document.getElementById('gradeInfo');
             if (activity.status === 'completed' && activity.grade) {
                 const gradeColor = activity.grade >= 90 ? '#22c55e' : activity.grade >= 70 ? '#f59e0b' : '#ef4444';
                 const gradeStatus = activity.grade >= 90 ? 'Excelente' : activity.grade >= 70 ? 'Aprobado' : 'Necesita Mejora';
                 
-                document.getElementById('gradeInfo').innerHTML = `
+                gradeInfo.innerHTML = `
                     <div class="grade-score">
-                        <div class="grade-number" style="color: ${gradeColor};">${activity.grade}</div>
-                        <div class="grade-total">/ 100 puntos</div>
+                        <div class="grade-number" style="color: ${gradeColor};">${Math.round(activity.grade)}</div>
+                        <div class="grade-total">/ ${activity.Puntos} puntos</div>
                         <div class="grade-status" style="background: ${gradeColor}20; color: ${gradeColor};">
                             ${gradeStatus}
                         </div>
@@ -1674,7 +1653,7 @@
                     ` : ''}
                 `;
             } else if (activity.status === 'grading') {
-                document.getElementById('gradeInfo').innerHTML = `
+                gradeInfo.innerHTML = `
                     <div class="pending-grade">
                         <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔍</div>
                         <div>Tu entrega está siendo revisada</div>
@@ -1683,6 +1662,8 @@
                         </div>
                     </div>
                 `;
+            } else {
+                 gradeInfo.innerHTML = `<div class="no-comments">Aún no hay calificación.</div>`;
             }
             
             // Mostrar modal
@@ -1692,17 +1673,127 @@
         function closeViewSubmissionModal() {
             document.getElementById('viewSubmissionModal').classList.remove('active');
         }
-
-        function downloadFile(fileName) {
-            // Simular descarga de archivo
-            alert(`📥 Descargando archivo: ${fileName}\n\nEn una implementación real, esto iniciaría la descarga del archivo desde el servidor.`);
-        }
-
+        
         // === FUNCIONES DEL MODAL DE ENTREGA ===
+
+        // Subir archivo y comentarios
+        async function submitActivity() {
+    const activityId = window.currentActivityId;
+    const comments = document.getElementById('submissionCommentsText').value.trim();
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    
+    const activity = activities.find(a => a.ActividadID === activityId);
+
+    if (!activity) {
+        alert('Error: No se pudo encontrar la actividad actual.');
+        return;
+    }
+
+    // Validación de archivo requerido
+    if (activity.ArchivoRequerido == 1 && !file) {
+        alert('Por favor selecciona un archivo para entregar, ya que esta actividad lo requiere.');
+        return;
+    }
+    
+    // Validación de tamaño de archivo (máximo 10MB)
+    if (file && file.size > 10 * 1024 * 1024) {
+        alert('El archivo es demasiado grande. Máximo 10MB permitido.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('activity_id', activityId);
+    formData.append('student_id', studentId);
+    formData.append('comments', comments);
+    
+    if (file) {
+        formData.append('submission_file', file);
+    }
+
+    // Referencias a elementos del modal
+    const submitBtn = document.getElementById('submitBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+
+    // 1. Iniciar animación de subida
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Subiendo...';
+    progressContainer.classList.add('show');
+    
+    let progress = 0;
+    let interval;
+
+    // Simulación del progreso de la subida (En un entorno real, esto se actualizaría con eventos de progreso del XHR)
+    interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 100) progress = 100;
+        
+        progressFill.style.width = progress + '%';
+        document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
+        
+        if (progress >= 100) {
+            clearInterval(interval);
+            
+            // 2. Ejecutar la petición al servidor
+            setTimeout(async () => {
+                try {
+                    const response = await fetch('submit_activity.php', {
+                        method: 'POST',
+                        body: formData // Enviamos FormData (soporta archivo)
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Error en el servidor al finalizar la entrega.');
+                    }
+
+                    // ÉXITO: Actualizar estado local
+                    const submittedDate = new Date().toISOString().split('T')[0];
+                    const isLate = result.is_late;
+                    const localIndex = activities.findIndex(a => a.ActividadID === activityId);
+                    
+                    if(localIndex !== -1) {
+                        // Actualizar el estado con la respuesta del servidor
+                        activities[localIndex].status = result.status; // 'grading'
+                        activities[localIndex].submittedDate = submittedDate;
+                        activities[localIndex].EntregaTardia = isLate ? 1 : 0;
+                        activities[localIndex].submissionComments = comments;
+                        activities[localIndex].submittedFile = file ? { 
+                            name: file.name, 
+                            size: (file.size / 1024 / 1024).toFixed(1) + ' MB', 
+                            type: file.type.split('/').pop().toUpperCase(), 
+                            ruta: result.file_path || '#' 
+                        } : null;
+                    }
+
+                    document.getElementById('submissionForm').style.display = 'none';
+                    document.getElementById('successMessage').classList.add('show');
+                    
+                    // Recargar listas para reflejar el estado 'grading'
+                    loadCourseHeader();
+                    loadActivities();
+
+                } catch (error) {
+                    alert(`❌ Error al entregar la actividad: ${error.message}`);
+                    // Detener animación y restaurar botón en caso de fallo
+                    progressContainer.classList.remove('show');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '📤 Entregar Actividad';
+                    progressFill.style.width = '0%';
+                    console.error(error);
+                }
+            }, 500); // Pequeña pausa para que la barra llegue al 100%
+        }
+    }, 200);
+}
+        
         function closeSubmissionModal() {
             const modal = document.getElementById('submissionModal');
             modal.classList.remove('active');
             
+            // Resetear el formulario
             document.getElementById('submissionForm').reset();
             document.getElementById('selectedFile').classList.remove('show');
             document.getElementById('progressContainer').classList.remove('show');
@@ -1716,11 +1807,9 @@
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if (!file) return;
-            
-            if (file.size > 10 * 1024 * 1024) {
-                alert('El archivo es demasiado grande. Máximo 10MB permitido.');
-                return;
+            if (!file) {
+                 document.getElementById('selectedFile').classList.remove('show');
+                 return;
             }
             
             document.getElementById('fileName').textContent = file.name;
@@ -1731,14 +1820,7 @@
         function setupModalEvents() {
             document.getElementById('submissionForm').addEventListener('submit', function(e) {
                 e.preventDefault();
-                
-                const fileInput = document.getElementById('fileInput');
-                if (!fileInput.files[0]) {
-                    alert('Por favor selecciona un archivo para entregar.');
-                    return;
-                }
-                
-                simulateFileUpload();
+                submitActivity();
             });
 
             document.addEventListener('keydown', function(e) {
@@ -1758,7 +1840,7 @@
 
             document.getElementById('submissionModal').addEventListener('click', function(e) {
                 if (e.target === this) {
-                    closeSubmissionModal();
+                    // No cerrar si se hace clic dentro del modal
                 }
             });
 
@@ -1768,56 +1850,7 @@
                 }
             });
         }
-
-        function simulateFileUpload() {
-            const submitBtn = document.getElementById('submitBtn');
-            const progressContainer = document.getElementById('progressContainer');
-            const progressFill = document.getElementById('progressFill');
-            const progressPercent = document.getElementById('progressPercent');
-            
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Subiendo...';
-            progressContainer.classList.add('show');
-            
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 15;
-                if (progress > 100) progress = 100;
-                
-                progressFill.style.width = progress + '%';
-                progressPercent.textContent = Math.round(progress) + '%';
-                
-                if (progress >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        completeSubmission();
-                    }, 500);
-                }
-            }, 200);
-        }
-
-        function completeSubmission() {
-            document.getElementById('submissionForm').style.display = 'none';
-            document.getElementById('successMessage').classList.add('show');
-            
-            const activity = currentCourse.activities.find(a => a.id === window.currentActivityId);
-            if (activity) {
-                const submissionDate = new Date().toISOString().split('T')[0];
-                const dueDate = new Date(activity.dueDate);
-                const submissionDateObj = new Date(submissionDate);
-                
-                // Determinar si es entrega tardía
-                const isLate = submissionDateObj > dueDate;
-                
-                activity.status = 'grading'; // Cambiar a estado de calificación pendiente
-                activity.submittedDate = submissionDate;
-                activity.isLateSubmission = isLate;
-                
-                loadCourseHeader();
-                loadActivities();
-            }
-        }
-
+        
         // === UTILIDADES ===
         function formatDate(dateString) {
             const date = new Date(dateString);
@@ -1829,19 +1862,6 @@
             return date.toLocaleDateString('es-ES', options);
         }
 
-        function showError(message) {
-            document.getElementById('courseName').textContent = 'Error';
-            document.getElementById('activitiesGrid').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">❌</div>
-                    <h3>${message}</h3>
-                    <p>Por favor, regresa a tus cursos e intenta nuevamente.</p>
-                    <a href="my-courses.html" style="display: inline-block; margin-top: 1rem; background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%); color: white; padding: 1rem 2rem; border-radius: 10px; text-decoration: none; font-weight: 600;">
-                        ← Volver a Mis Cursos
-                    </a>
-                </div>
-            `;
-        }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98c2e48386f7465c',t:'MTc2MDA2NTQ5MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>

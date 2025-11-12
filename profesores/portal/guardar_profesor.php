@@ -89,7 +89,7 @@ if (strlen($password) < 8) {
 // $pass_hash = password_hash($password, PASSWORD_BCRYPT);
 
 // Verifica si el correo ya existe
-$check = $mysqli->prepare('SELECT 1 FROM maestroregistro WHERE MstroCorreo = ? LIMIT 1');
+$check = $mysqli->prepare('SELECT 1 FROM profesorregistro WHERE ProfCorreo = ? LIMIT 1');
 if (!$check) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error preparando consulta']);
@@ -107,7 +107,7 @@ if ($check->num_rows > 0) {
 $check->close();
 
 // Inserta el registro
-$stmt = $mysqli->prepare('INSERT INTO maestroregistro (MstroNombre, MstroAps, MstroCorreo, MstroDpto, MstroPassword) VALUES (?,?,?,?,?)');
+$stmt = $mysqli->prepare('INSERT INTO profesorregistro (ProfNombre, ProfApellido, ProfCorreo, Departamento, Profpassword) VALUES (?,?,?,?,?)');
 if (!$stmt) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error preparando consulta de inserción']);

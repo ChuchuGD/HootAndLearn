@@ -27,7 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     $email = trim($_POST['login_email']);
     $password = $_POST['login_password'];
 
-    $stmt = $conn->prepare("SELECT IDMstro, MstroNombre, MstroCorreo, MstroPassword FROM maestroregistro WHERE MstroCorreo = ?");
+    $stmt = $conn->prepare("SELECT ProfID, ProfNombre, ProfCorreo, ProfPassword FROM profesorregistro WHERE ProfCorreo = ?");
     
     if ($stmt === false) {
         die("Error en la preparación de la consulta LOGIN: " . $conn->error);
@@ -51,12 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
         elseif ($password === $user['MstroPassword']) {
             $passwordMatch = true;
             
-            // Actualizar a contraseña hasheada
-            $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $update_pass = $conn->prepare("UPDATE maestroregistro SET MstroPassword = ? WHERE IDMstro = ?");
-            $update_pass->bind_param("si", $hashed, $user['IDMstro']);
-            $update_pass->execute();
-            $update_pass->close();
+
         }
         
         if ($passwordMatch) {

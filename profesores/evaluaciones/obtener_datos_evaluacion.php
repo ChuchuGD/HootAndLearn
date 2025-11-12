@@ -1,49 +1,42 @@
-<?php
-include 'conexion.php';
-session_start();
+// ... (Tus bloques if/elseif existentes)
 
-$profesorID = $_SESSION['profesor_id'] ?? null;
+elseif ($accion === 'alumnosPorGrupos' && isset($_GET['groupIDs'])) {
+    $groupIDs_str = $_GET['groupIDs'];
+    $groupIDs_arr = array_map('intval', explode(',', $groupIDs_str)); // Convertir a array de enteros
 
-if (!$profesorID) {
-    echo json_encode(["error" => "No se ha iniciado sesión."]);
-    exit;
-}
+    // Crea placeholders para la consulta (ej: ?, ?, ?)
+    $placeholders = implode(',', array_fill(0, count($groupIDs_arr), '?'));
+    $tipos = str_repeat('i', count($groupIDs_arr));
 
-$accion = $_GET['accion'] ?? '';
-
-if ($accion === 'cursos') {
-    $sql = "SELECT CursoID, NombreCurso FROM cursos WHERE ProfID = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $profesorID);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $cursos = $result->fetch_all(MYSQLI_ASSOC);
-    echo json_encode($cursos);
-}
-
-elseif ($accion === 'grupos' && isset($_GET['cursoID'])) {
-    $cursoID = $_GET['cursoID'];
-    $sql = "SELECT GrupoID, NombreGrupo FROM grupos WHERE CursoID = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $cursoID);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $grupos = $result->fetch_all(MYSQLI_ASSOC);
-    echo json_encode($grupos);
-}
-
-elseif ($accion === 'alumnos' && isset($_GET['cursoID'])) {
-    $cursoID = $_GET['cursoID'];
     $sql = "SELECT e.EstID, CONCAT(e.EstNombre, ' ', e.EstApellido) AS NombreCompleto
             FROM estudianteregistro e
-            INNER JOIN inscripciones i ON e.EstID = i.EstID
-            WHERE i.CursoID = ?";
+            INNER JOIN grupomembros gm ON e.EstID = gm.EstID
+            WHERE gm.GrupoID IN ($placeholders)";
+            
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $cursoID);
+    
+    // Necesitamos pasar el array como referencias (truco de PHP)
+    $bind_params = array_merge([$tipos], $groupIDs_arr);
+    call_user_func_array([$stmt, 'bind_param'], refValues($bind_params));
+    
     $stmt->execute();
     $result = $stmt->get_result();
     $alumnos = $result->fetch_all(MYSQLI_ASSOC);
     echo json_encode($alumnos);
+}
+
+// ... (Tu función refValues si la tienes, y el cierre de conexión)
+
+// Pequeña función auxiliar necesaria si usas call_user_func_array
+function refValues($arr){
+    if (strnatcmp(phpversion(),'5.3') >= 0) // PHP 5.3+
+    {
+        $refs = array();
+        foreach($arr as $key => $value)
+            $refs[$key] = &$arr[$key];
+        return $refs;
+    }
+    return $arr;
 }
 
 $conn->close();

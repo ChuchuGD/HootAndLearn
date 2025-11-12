@@ -2,8 +2,8 @@
 // Configuración de la base de datos
 $servername = "localhost"; // O la dirección IP de tu servidor de base de datos
 $username = "root"; // Tu nombre de usuario de MySQL
-$password = "2435"; // Tu contraseña de MySQL
-$dbname = "Hoot&Learn"; // El nombre de la base de datos a la que quieres conectarte
+$password = ""; // Tu contraseña de MySQL
+$dbname = "HootLearn"; // El nombre de la base de datos a la que quieres conectarte
 
 // --- 1. Crear la conexión ---
 $conn = new mysqli($servername, $username, $password, $dbname);

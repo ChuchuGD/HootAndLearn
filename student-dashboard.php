@@ -239,7 +239,6 @@ $studentId = 'EST' . str_pad($_SESSION['student_id'], 3, '0', STR_PAD_LEFT);
     </style>
 </head>
 <body>
-    <!-- COPIA TODO EL HTML DE student-dashboard.html AQUÍ -->
     
     <div class="animated-bg"></div>
 

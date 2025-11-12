@@ -25,7 +25,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
     $contraseña = $_POST['contraseña'];
     
     // Verificar si el correo ya existe
-    $check_stmt = $conn->prepare("SELECT IDEst FROM estudianteregistro WHERE EstCorreo = ?");
+    $check_stmt = $conn->prepare("SELECT EstID FROM estudianteregistro WHERE EstCorreo = ?");
     
     if ($check_stmt === false) {
         die("Error en la preparación de la consulta: " . $conn->error);
@@ -68,7 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     $email = trim($_POST['login_email']);
     $password = $_POST['login_password'];
 
-    $stmt = $conn->prepare("SELECT IDEst, EstNombre, EstCorreo, Estpassword FROM estudianteregistro WHERE EstCorreo = ?");
+    $stmt = $conn->prepare("SELECT EstID, EstNombre, EstCorreo, Estpassword FROM estudianteregistro WHERE EstCorreo = ?");
     
     if ($stmt === false) {
         die("Error en la preparación de la consulta LOGIN: " . $conn->error);
@@ -95,7 +95,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
         if ($passwordMatch) {
             // Crear sesión
             $_SESSION['student_logged_in'] = true;
-            $_SESSION['student_id'] = $user['IDEst'];
+            $_SESSION['student_id'] = $user['EstID'];
             $_SESSION['student_name'] = $user['EstNombre'];
             $_SESSION['student_email'] = $user['EstCorreo'];
             $_SESSION['login_time'] = date('Y-m-d H:i:s');

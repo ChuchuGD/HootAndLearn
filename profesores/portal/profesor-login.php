@@ -22,12 +22,13 @@ if ($conn->connect_error) {
 // Configurar charset UTF-8
 $conn->set_charset("utf8mb4");
 
-// Proceso de inicio de sesión de estudiante
+// Proceso de inicio de sesión de profesor
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     $email = trim($_POST['login_email']);
     $password = $_POST['login_password'];
 
-    $stmt = $conn->prepare("SELECT ProfID, ProfNombre, ProfCorreo, ProfPassword FROM profesorregistro WHERE ProfCorreo = ?");
+    // Columnas correctas según tu tabla profesorregistro
+    $stmt = $conn->prepare("SELECT ProfID, ProfNombre, ProfCorreo, Profpassword FROM profesorregistro WHERE ProfCorreo = ?");
     
     if ($stmt === false) {
         die("Error en la preparación de la consulta LOGIN: " . $conn->error);
@@ -37,40 +38,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     $stmt->execute();
     $result = $stmt->get_result();
 
-    if ($result->num_rows > 0) {
+    if ($result && $result->num_rows > 0) {
         $user = $result->fetch_assoc();
         
-        // Verificar contraseña (compatible con hash y sin hash para testing)
         $passwordMatch = false;
-        
-        // Primero intentar con hash
-        if (password_verify($password, $user['MstroPassword'])) {
+        // Si la contraseña en BD está hasheada
+        if (password_verify($password, $user['Profpassword'])) {
             $passwordMatch = true;
-        } 
-        // Si falla, verificar si la contraseña está sin hash (para retrocompatibilidad)
-        elseif ($password === $user['MstroPassword']) {
+        } elseif ($password === $user['Profpassword']) {
+            // retrocompatibilidad si no hay hash
             $passwordMatch = true;
-            
-
         }
         
         if ($passwordMatch) {
-            // Crear sesión
-            $_SESSION['teacher_logged_in'] = true;
-            $_SESSION['teacher_id'] = $user['IDMstro'];
-            $_SESSION['teacher_name'] = $user['MstroNombre'];
-            $_SESSION['teacher_email'] = $user['MstroCorreo'];
+            // Crear sesión y redirigir con maestro_id en la URL
+            $_SESSION['maestro_id'] = (int)$user['ProfID'];
+            $_SESSION['maestro_name'] = $user['ProfNombre'];
+            $_SESSION['maestro_email'] = $user['ProfCorreo'];
             $_SESSION['login_time'] = date('Y-m-d H:i:s');
-                
-                // Redirigir al dashboard
-            header("Location: ../dashboard-profesores.php");
+
+            $id = (int)$user['ProfID'];
+            header("Location: ../dashboard-profesores.php?maestro_id={$id}");
             exit();
         } else {
-            echo "<script>alert('❌ Contraseña incorrecta. Por favor intenta nuevamente.');</script>";
+            $error = 'Contraseña incorrecta. Por favor intenta nuevamente.';
         }
-        header("Location: ../dashboard-profesores.php");
     } else {
-        echo "<script>alert('❌ No existe una cuenta con este correo electrónico.');</script>";
+        $error = 'No existe una cuenta con este correo electrónico.';
     }
     $stmt->close();
 }

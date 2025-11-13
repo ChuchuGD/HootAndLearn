@@ -21,38 +21,23 @@ $conn->set_charset("utf8mb4");
 
 $mensaje = "";
 $error = "";
-$curso = null;
-
-// Obtener ID del curso
-$cursoId = $_GET['id'] ?? null;
-
-if (!$cursoId) {
-    header("Location: cursos_profesores.php");
-    exit();
-}
-
-// Obtener datos del curso
-$stmt = $conn->prepare("SELECT * FROM cursos WHERE IDCurso = ? AND ProfID = ?");
-if ($stmt) {
-    $stmt->bind_param("ii", $cursoId, $maestro_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $curso = $result->fetch_assoc();
-    $stmt->close();
-}
-
-if (!$curso) {
-    $error = "Curso no encontrado o no tienes permisos para editarlo.";
-}
 
 // Procesar formulario cuando se envía
-if ($_SERVER["REQUEST_METHOD"] == "POST" && $curso) {
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $nombreCurso = trim($_POST['nombre_curso'] ?? '');
     $descripcion = trim($_POST['descripcion'] ?? '');
     $duracion = trim($_POST['duracion'] ?? '');
-    $instructor = trim($_POST['instructor'] ?? '');
     $icono = trim($_POST['icono'] ?? '📚');
+    $instructor = trim($_POST['instructor'] ?? '');
     $lecciones = (int)($_POST['lecciones'] ?? 0);
+    $precio = trim($_POST['precio'] ?? ''); 
+    $fechaCreacion = $_POST['fechaCreacion'] ?? date('Y-m-d H:i:s');
+
+    // asegurarse de tipos para bind_param
+    $maestro_id = (int)$maestro_id;
+    $lecciones = (int)$lecciones;
+    // convertir precio a número si corresponde (si tu columna es DECIMAL/DOUBLE)
+    $precio = is_numeric($precio) ? (float)$precio : $precio;
     
     // Validaciones
     if (empty($nombreCurso)) {
@@ -62,23 +47,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && $curso) {
     } elseif (empty($duracion)) {
         $error = "La duración es obligatoria.";
     } else {
-        // Actualizar curso en la base de datos
-        $stmt = $conn->prepare("UPDATE cursos SET Titulo = ?, Descripcion = ?, Duracion = ?, Instructor = ?, Icono = ?, Lecciones = ? WHERE IDCurso = ? AND ProfID = ?");
+        // Insertar curso en la base de datos
+        $stmt = $conn->prepare("INSERT INTO cursos (NombreCurso, Descripcion, ProfID, Icono, TotalLecciones, Duracion, Precio, FechaCreacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         
         if ($stmt) {
-            $stmt->bind_param("sssssiii", $nombreCurso, $descripcion, $duracion, $instructor, $icono, $lecciones, $cursoId, $maestro_id);
+            // tipos: s(nombre), s(descripción), i(profID), s(icono), i(lecciones), s(duración), d(precio), s(fechaCreacion)
+            $stmt->bind_param("ssisisds", $nombreCurso, $descripcion, $maestro_id, $icono, $lecciones, $duracion, $precio, $fechaCreacion);
             
             if ($stmt->execute()) {
-                $mensaje = "Curso actualizado exitosamente.";
-                // Recargar datos del curso
-                $curso['Titulo'] = $nombreCurso;
-                $curso['Descripcion'] = $descripcion;
-                $curso['Duracion'] = $duracion;
-                $curso['Instructor'] = $instructor;
-                $curso['Icono'] = $icono;
-                $curso['Lecciones'] = $lecciones;
+                $mensaje = "Curso creado exitosamente.";
+                // Limpiar campos después de crear
+                $nombreCurso = $descripcion = $duracion = $instructor = "";
+                $lecciones = 0;
+                $icono = "📚";
             } else {
-                $error = "Error al actualizar el curso: " . $stmt->error;
+                $error = "Error al crear el curso: " . $stmt->error;
             }
             $stmt->close();
         } else {
@@ -94,7 +77,7 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Curso - Hoot & Learn</title>
+    <title>Crear Curso - Hoot & Learn</title>
     <style>
         * {
             margin: 0;
@@ -274,17 +257,6 @@ $conn->close();
             margin-top: 0.25rem;
         }
         
-        .course-id-badge {
-            display: inline-block;
-            background: #ede9fe;
-            color: #6b21a8;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-        
         @media (max-width: 768px) {
             body {
                 padding: 1rem;
@@ -311,11 +283,8 @@ $conn->close();
 <body>
     <div class="container">
         <header>
-            <h1>✏️ Editar Curso</h1>
-            <p class="subtitle">Modifica la información del curso</p>
-            <?php if ($curso): ?>
-                <div class="course-id-badge">ID del Curso: <?= htmlspecialchars($curso['IDCurso']) ?></div>
-            <?php endif; ?>
+            <h1>✨ Crear Nuevo Curso</h1>
+            <p class="subtitle">Completa la información para crear un curso</p>
         </header>
         
         <?php if ($mensaje): ?>
@@ -330,8 +299,10 @@ $conn->close();
             </div>
         <?php endif; ?>
         
-        <?php if ($curso): ?>
         <form method="POST" action="">
+            <!-- input oculto para la fecha/hora del cliente -->
+            <input type="hidden" id="fechaCreacion" name="fechaCreacion" value="<?= htmlspecialchars($fechaCreacion ?? '') ?>">
+
             <div class="form-group">
                 <label for="nombre_curso">Nombre del Curso *</label>
                 <input 
@@ -340,7 +311,7 @@ $conn->close();
                     name="nombre_curso" 
                     required
                     placeholder="Ej: Introducción a JavaScript"
-                    value="<?= htmlspecialchars($curso['Titulo'] ?? '') ?>"
+                    value="<?= htmlspecialchars($nombreCurso ?? '') ?>"
                 >
             </div>
             
@@ -351,7 +322,7 @@ $conn->close();
                     name="descripcion" 
                     required
                     placeholder="Describe de qué trata el curso, qué aprenderán los estudiantes..."
-                ><?= htmlspecialchars($curso['Descripcion'] ?? '') ?></textarea>
+                ><?= htmlspecialchars($descripcion ?? '') ?></textarea>
                 <div class="helper-text">Proporciona una descripción detallada del curso</div>
             </div>
             
@@ -364,7 +335,7 @@ $conn->close();
                         name="instructor" 
                         required
                         placeholder="Tu nombre"
-                        value="<?= htmlspecialchars($curso['Instructor'] ?? '') ?>"
+                        value="<?= htmlspecialchars($instructor ?? '') ?>"
                     >
                 </div>
                 
@@ -376,7 +347,7 @@ $conn->close();
                         name="duracion" 
                         required
                         placeholder="Ej: 8 semanas, 40 horas"
-                        value="<?= htmlspecialchars($curso['Duracion'] ?? '') ?>"
+                        value="<?= htmlspecialchars($duracion ?? '') ?>"
                     >
                 </div>
             </div>
@@ -389,23 +360,27 @@ $conn->close();
                     name="lecciones" 
                     min="0"
                     placeholder="Ej: 12"
-                    value="<?= htmlspecialchars($curso['Lecciones'] ?? 0) ?>"
+                    value="<?= htmlspecialchars($lecciones ?? 0) ?>"
                 >
                 <div class="helper-text">Cantidad total de lecciones del curso</div>
             </div>
             
             <div class="form-group">
                 <label>Ícono del Curso</label>
-                <input type="hidden" id="icono" name="icono" value="<?= htmlspecialchars($curso['Icono'] ?? '📚') ?>">
+                <input type="hidden" id="icono" name="icono" value="<?= htmlspecialchars($icono ?? '📚') ?>">
                 <div class="icon-selector">
-                    <?php
-                    $icons = ['📚', '💻', '🎨', '🔬', '📊', '🎯', '🚀', '🎓', '📝', '🌐', '🎬', '🎵'];
-                    $selectedIcon = $curso['Icono'] ?? '📚';
-                    foreach ($icons as $icon) {
-                        $selected = ($icon === $selectedIcon) ? 'selected' : '';
-                        echo "<div class='icon-option $selected' onclick=\"selectIcon(this, '$icon')\">$icon</div>";
-                    }
-                    ?>
+                    <div class="icon-option selected" onclick="selectIcon(this, '📚')">📚</div>
+                    <div class="icon-option" onclick="selectIcon(this, '💻')">💻</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🎨')">🎨</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🔬')">🔬</div>
+                    <div class="icon-option" onclick="selectIcon(this, '📊')">📊</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🎯')">🎯</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🚀')">🚀</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🎓')">🎓</div>
+                    <div class="icon-option" onclick="selectIcon(this, '📝')">📝</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🌐')">🌐</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🎬')">🎬</div>
+                    <div class="icon-option" onclick="selectIcon(this, '🎵')">🎵</div>
                 </div>
             </div>
             
@@ -414,21 +389,29 @@ $conn->close();
                     ← Cancelar
                 </a>
                 <button type="submit" class="btn btn-primary">
-                    💾 Guardar Cambios
+                    💾 Crear Curso
                 </button>
             </div>
         </form>
-        <?php else: ?>
-            <div style="text-align: center; padding: 2rem;">
-                <p style="color: #6b7280; margin-bottom: 1rem;">No se pudo cargar el curso</p>
-                <a href="cursos_profesores.php" class="btn btn-secondary">
-                    ← Volver a Mis Cursos
-                </a>
-            </div>
-        <?php endif; ?>
     </div>
     
     <script>
+        // Establece fecha/hora local del cliente en formato YYYY-MM-DD HH:MM:SS
+        function setFechaCreacion() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const s = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            const input = document.getElementById('fechaCreacion');
+            if (input) input.value = s;
+        }
+
+        // Poner valor al cargar y justo antes de enviar el formulario
+        document.addEventListener('DOMContentLoaded', () => {
+            setFechaCreacion();
+            const form = document.querySelector('form');
+            if (form) form.addEventListener('submit', setFechaCreacion);
+        });
+        
         function selectIcon(element, icon) {
             // Remover selección anterior
             document.querySelectorAll('.icon-option').forEach(opt => {

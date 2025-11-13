@@ -378,32 +378,15 @@ $showDeleteSuccess = isset($_GET['deleted']) && $_GET['deleted'] == '1';
                 </thead>
                 <tbody>
                     <?php foreach ($cursos as $curso): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($curso['IDCurso'] ?? '') ?></td>
-                            <td>
-                                <div class="course-name">
-                                    <span class="course-icon"><?= htmlspecialchars($curso['Icono'] ?? '📚') ?></span>
-                                    <span><?= htmlspecialchars($curso['Titulo'] ?? '') ?></span>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="course-description">
-                                    <?= htmlspecialchars($curso['Descripcion'] ?? '') ?>
-                                </div>
-                            </td>
-                            <td><?= htmlspecialchars($curso['Duracion'] ?? 'N/A') ?></td>
-                            <td><?= htmlspecialchars($curso['Lecciones'] ?? 0) ?></td>
-                            <td>
-                                <div class="actions-cell">
-                                    <a class="btn btn-edit" href="edit.php?id=<?= urlencode($curso['IDCurso'] ?? '') ?>">
-                                        ✏️ Editar
-                                    </a>
-                                    <a class="btn btn-delete" href="eliminar_curso.php?id=<?= urlencode($curso['IDCurso'] ?? '') ?>">
-                                        🗑️ Eliminar
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
+<tr>
+    <td><?= (int)$curso['CursoID'] ?></td>
+    <td><?= htmlspecialchars($curso['NombreCurso']) ?></td>
+    <td><?= htmlspecialchars($curso['Duracion'] ?? '') ?></td>
+    <td>
+        <a class="btn" href="editar_curso.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Editar</a>
+        <a class="btn btn-danger" href="eliminar_curso.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Eliminar</a>
+    </td>
+</tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>

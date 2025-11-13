@@ -40,11 +40,12 @@ if (!is_array($data)) {
     exit;
 }
 
-$nombre   = trim($data['MstroNombre'] ?? '');
-$apellidos= trim($data['MstroAps'] ?? '');
-$correo   = strtolower(trim($data['MstroCorreo'] ?? ''));
-$dpto     = trim($data['MstroDpto'] ?? '');
-$password = (string)($data['MstroPassword'] ?? '');
+$nombre     = trim($data['MstroNombre'] ?? '');
+$apellidos  = trim($data['MstroAps'] ?? '');
+$correo     = strtolower(trim($data['MstroCorreo'] ?? ''));
+$dpto       = trim($data['MstroDpto'] ?? '');
+$password   = (string)($data['MstroPassword'] ?? '');
+$empleadoID = trim($data['MstroEmpleadoID'] ?? '');
 
 if ($nombre === '' || $apellidos === '' || $correo === '' || $dpto === '' || $password === '') {
     http_response_code(400);
@@ -52,9 +53,10 @@ if ($nombre === '' || $apellidos === '' || $correo === '' || $dpto === '' || $pa
     exit;
 }
 
-if (mb_strlen($nombre) > 50 || mb_strlen($apellidos) > 50) {
+// Ajuste de longitudes para concordar con la tabla (VARCHAR(255))
+if (mb_strlen($nombre) > 255 || mb_strlen($apellidos) > 255) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Nombre/Apellidos exceden 50 caracteres']);
+    echo json_encode(['success' => false, 'message' => 'Nombre/Apellidos exceden 255 caracteres']);
     exit;
 }
 
@@ -63,9 +65,15 @@ if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
     echo json_encode(['success' => false, 'message' => 'Correo inválido']);
     exit;
 }
-if (mb_strlen($correo) > 30) {
+if (mb_strlen($correo) > 255) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'El correo excede 30 caracteres definidos en la BD']);
+    echo json_encode(['success' => false, 'message' => 'El correo excede 255 caracteres definidos en la BD']);
+    exit;
+}
+
+if (mb_strlen($empleadoID) > 50) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'EmpleadoID excede 50 caracteres']);
     exit;
 }
 
@@ -86,6 +94,7 @@ if (strlen($password) < 8) {
     exit;
 }
 
+// Se recomienda hashear la contraseña; se deja comentario para implementar si lo desea
 // $pass_hash = password_hash($password, PASSWORD_BCRYPT);
 
 // Verifica si el correo ya existe
@@ -106,19 +115,19 @@ if ($check->num_rows > 0) {
 }
 $check->close();
 
-// Inserta el registro
-$stmt = $mysqli->prepare('INSERT INTO profesorregistro (ProfNombre, ProfApellido, ProfCorreo, Departamento, Profpassword) VALUES (?,?,?,?,?)');
+// Inserta el registro incluyendo EmpleadoID (NULL si se envía cadena vacía)
+$stmt = $mysqli->prepare('INSERT INTO profesorregistro (ProfNombre, ProfApellido, ProfCorreo, Departamento, Profpassword, EmpleadoID) VALUES (?,?,?,?,?, NULLIF(?,\'\'))');
 if (!$stmt) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error preparando consulta de inserción']);
     exit;
 }
-$stmt->bind_param('sssss', $nombre, $apellidos, $correo, $dpto, $password);
+$stmt->bind_param('ssssss', $nombre, $apellidos, $correo, $dpto, $password, $empleadoID);
 
 if (!$stmt->execute()) {
     $msg = 'No se pudo guardar el registro';
     if ($stmt->errno === 1406) {
-        $msg = 'Datos demasiado largos para las columnas. Asegura que MstroPassword sea VARCHAR(255) y el correo <= 30 chars.';
+        $msg = 'Datos demasiado largos para las columnas. Asegura que Prof* sean VARCHAR(255) y EmpleadoID <= 50 chars.';
     }
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => $msg, 'code' => $stmt->errno]);

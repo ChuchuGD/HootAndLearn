@@ -674,12 +674,6 @@
                 showFieldError('email', 'Por favor ingresa un correo válido');
                 return false;
             }
-            // const institutionalDomains = ['.edu', '.ac.', 'universidad', 'instituto', 'college', 'school'];
-            // const hasInstitutionalDomain = institutionalDomains.some(domain => value.includes(domain));
-            // if (!hasInstitutionalDomain) {
-            //     showFieldError('email', 'Debe ser un correo institucional válido (.edu, .ac., universidad, etc.)');
-            //     return false;
-            // }
             clearFieldError('email');
             return true;
         }
@@ -687,22 +681,6 @@
         function validatePassword() {
             const password = document.getElementById('password');
             const value = password.value;
-
-            /*if (!value) {
-                showFieldError('password', 'La contraseña es obligatoria');
-                return false;
-            }
-            if (value.length < 8) {
-                showFieldError('password', 'La contraseña debe tener al menos 8 caracteres');
-                return false;
-            }
-            const hasLetter = /[a-zA-Z]/.test(value);
-            const hasNumber = /\d/.test(value);
-            if (!hasLetter || !hasNumber) {
-                showFieldError('password', 'La contraseña debe contener al menos una letra y un número');
-                return false;
-            }
-            clearFieldError('password');*/
             return true;
         }
 
@@ -743,12 +721,16 @@
         async function handleRegister(e) {
             e.preventDefault();
 
+            // toma segura del employeeId (si el input no existe, queda cadena vacía)
+            const employeeEl = document.getElementById('employeeId');
+            const employeeIdVal = employeeEl ? employeeEl.value.trim() : '';
+
             const formData = {
                 firstName: document.getElementById('firstName').value.trim(),
                 lastName: document.getElementById('lastName').value.trim(),
                 email: document.getElementById('email').value.trim().toLowerCase(),
                 department: document.getElementById('department').value,
-                employeeId: document.getElementById('employeeId').value.trim(),
+                employeeId: employeeIdVal,
                 password: document.getElementById('password').value,
                 confirmPassword: document.getElementById('confirmPassword').value,
                 agreeTerms: document.getElementById('agreeTerms').checked,
@@ -778,7 +760,8 @@
                         MstroAps: formData.lastName,
                         MstroCorreo: formData.email,
                         MstroDpto: formData.department,
-                        MstroPassword: formData.password
+                        MstroPassword: formData.password,
+                        MstroEmpleadoID: formData.employeeId // agregado para concordar con la tabla
                     })
                 });
 

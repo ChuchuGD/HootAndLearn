@@ -438,7 +438,7 @@
             </a>
 
             <!-- OPCIÓN 3: EVALUACIONES -->
-            <a href="../profesores/evaluaciones/index.html" class="option-card evaluaciones">
+            <a href="../profesores/evaluaciones/evaluaciones_profesores.php" class="option-card evaluaciones">
                 <span class="option-icon">📊</span>
                 <h2 class="option-title">Evaluaciones</h2>
                 <p class="option-description">

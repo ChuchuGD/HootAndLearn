@@ -420,7 +420,7 @@
             </a>
 
             <!-- OPCIÓN 2: ASIGNACIONES -->
-            <a href="asignaciones/asignaciones.php" class="option-card asignaciones">
+            <a href="asignaciones/asignaciones_profesores.php" class="option-card asignaciones">
                 <span class="option-icon">📝</span>
                 <h2 class="option-title">Asignaciones</h2>
                 <p class="option-description">

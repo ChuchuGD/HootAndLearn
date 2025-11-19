@@ -383,7 +383,8 @@ $showDeleteSuccess = isset($_GET['deleted']) && $_GET['deleted'] == '1';
     <td><?= htmlspecialchars($curso['NombreCurso']) ?></td>
     <td><?= htmlspecialchars($curso['Duracion'] ?? '') ?></td>
     <td>
-        <a class="btn" href="editar_curso.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Editar</a>
+        <a class="btn" href="student-manage.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Gestionar</a>
+        <a class="btn" href="edit.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Editar</a>
         <a class="btn btn-danger" href="eliminar_curso.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Eliminar</a>
     </td>
 </tr>

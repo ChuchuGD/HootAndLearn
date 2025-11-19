@@ -74,26 +74,7 @@ if ($stmt2) {
     $stmt2->execute();
     $res2 = $stmt2->get_result();
     while ($row = $res2->fetch_assoc()) {
-        $evaluacion = [
-            'id' => (int)$row['EvaluacionID'],
-            'cursoID' => (int)$row['CursoID'],
-            'Titulo' => $row['Titulo'],
-            'evaluationTitle' => $row['Titulo'],
-            'Descripcion' => $row['Descripcion'],
-            'description' => $row['Descripcion'],
-            'duration' => (int)$row['Duracion'],
-            'totalQuestions' => (int)$row['TotalPreguntas'],
-            'maxScore' => (int)$row['Puntos'],
-            'dueDate' => $row['FechaVencimiento'],
-            'attempts' => (int)$row['Intentos'],
-            'requiresFile' => (bool)$row['RequiereArchivo'],
-            'fechaCreacion' => $row['FechaCreacion'],
-            'activo' => (bool)$row['Activo'],
-            'NombreCurso' => $row['NombreCurso'],
-            'assignedStudents' => json_encode([]),
-            'assignedGroups' => json_encode([])
-        ];
-        $evaluaciones[] = $evaluacion;
+        $evaluaciones[] = $row;
     }
     $stmt2->close();
 } else {
@@ -127,26 +108,7 @@ if ($stmtA) {
     $stmtA->execute();
     $resA = $stmtA->get_result();
     while ($row = $resA->fetch_assoc()) {
-        $actividad = [
-            'ActividadID' => (int)$row['ActividadID'],
-            'id' => (int)$row['ActividadID'],
-            'CursoID' => (int)$row['CursoID'],
-            'cursoID' => (int)$row['CursoID'],
-            'Titulo' => $row['Titulo'],
-            'TituloCorto' => $row['Titulo'],
-            'TituloRender' => $row['Titulo'],
-            'Descripcion' => $row['Descripcion'],
-            'Tipo' => $row['Tipo'],
-            'Puntos' => (int)$row['Puntos'],
-            'FechaVencimiento' => $row['FechaVencimiento'],
-            'Requisitos' => $row['Requisitos'],
-            'ArchivoRequerido' => (bool)$row['ArchivoRequerido'],
-            'FechaCreacion' => $row['FechaCreacion'],
-            'Activo' => (bool)$row['Activo'],
-            'NombreCurso' => $row['NombreCurso'],
-            'submissions' => json_encode([])
-        ];
-        $actividades[] = $actividad;
+        $actividades[] = $row;
     }
     $stmtA->close();
 } else {
@@ -164,119 +126,135 @@ header('Content-Type: text/html; charset=utf-8');
 ?>
 <!doctype html>
 <html lang="es">
- <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Asignación de Evaluaciones</title>
-  <link rel="stylesheet" href="./evaluaciones.css">
-  <style>@view-transition { navigation: auto; }</style>
- </head>
- <body>
-  <div class="container">
-   <div class="header">
-    <h1 id="app-title">📋 Asignación de Evaluaciones</h1>
-    <p id="welcome-message">Asigna evaluaciones y asignaciones a tus cursos</p>
-   </div>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evaluaciones y Asignaciones — Profesor</title>
+  <style>
+    :root{
+      --bg:#f5f7fb; --card:#fff; --muted:#6b7280; --primary:#6b21a8; --accent:#7e22ce;
+      --danger:#dc2626; --radius:10px;
+    }
+    body{margin:0;font-family:Segoe UI,Roboto,Arial;background:var(--bg);color:#111;}
+    .wrap{max-width:1200px;margin:28px auto;padding:20px;}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    .title{display:flex;gap:12px;align-items:center}
+    .title h1{margin:0;color:var(--primary);font-size:1.4rem}
+    .meta{color:var(--muted);font-size:.95rem}
+    .actions{display:flex;gap:8px}
+    .btn{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:600}
+    .btn-outline{background:transparent;border:1px solid rgba(0,0,0,.06);color:var(--accent)}
+    .btn-danger{background:var(--danger)}
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:18px}
+    .panel{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:0 6px 18px rgba(13,38,76,0.06)}
+    .list{display:grid;gap:12px}
+    .card{border-radius:10px;padding:12px;background:#fff;border:1px solid rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:8px}
+    .card h3{margin:0;font-size:1.05rem}
+    .card .small{font-size:.9rem;color:var(--muted)}
+    .card .desc{color:#111;font-size:.95rem}
+    .card .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .chip{background:#f3f4f6;padding:6px 8px;border-radius:8px;font-size:.85rem;color:var(--muted)}
+    .right-actions{display:flex;gap:8px}
+    .assign-list{display:grid;gap:8px}
+    @media(max-width:980px){ .grid{grid-template-columns:1fr; } .actions{flex-wrap:wrap} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">
+        <h1>📋 Evaluaciones</h1>
+        <div class="meta">Profesor ID: <?php echo (int)$maestro_id; ?> — Cursos: <?php echo count($courses); ?></div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="create.php?maestro_id=<?php echo (int)$maestro_id; ?>">➕ Crear evaluación</a>
+        <a class="btn btn-outline" href="../cursos/cursos_profesores.php?maestro_id=<?php echo (int)$maestro_id; ?>">📚 Mis cursos</a>
+      </div>
+    </div>
 
-   <div class="info" style="margin:1rem 0;">
-     <strong>Maestro ID:</strong> <?php echo (int)$maestro_id; ?> —
-     <strong>Cursos:</strong> <?php echo count($courses); ?> —
-     <strong>Evaluaciones:</strong> <?php echo count($evaluaciones); ?> —
-     <strong>Asignaciones:</strong> <?php echo count($actividades); ?>
-   </div>
+    <div class="grid">
+      <div class="panel">
+        <h2 style="margin-top:0">Listado de evaluaciones</h2>
+        <div class="list" id="evaluations-list">
+          <!-- JS render -->
+        </div>
+      </div>
 
-   <div style="display:flex; gap:16px; flex-wrap:wrap;">
-     <div style="flex:1; min-width:320px;">
-       <h2>Evaluaciones</h2>
-       <div id="evaluations-container"></div>
-     </div>
-     <div style="flex:1; min-width:320px;">
-       <h2>Asignaciones (Actividades)</h2>
-       <div id="assignments-container"></div>
-     </div>
-   </div>
+      <aside class="panel">
+        <h3 style="margin-top:0">Asignaciones recientes</h3>
+        <div class="assign-list" id="assignments-list">
+          <!-- JS render -->
+        </div>
+        <div style="margin-top:12px;text-align:right">
+          <a class="btn" href="../asignaciones/create.php?maestro_id=<?php echo (int)$maestro_id; ?>">➕ Crear asignación</a>
+        </div>
+      </aside>
+    </div>
   </div>
 
-  <!-- Datos incrustados desde PHP (deben estar antes del JS que los usa) -->
   <script>
     const serverCourses = <?php echo $jsCourses ?? '[]'; ?>;
     const serverEvaluations = <?php echo $jsEvaluations ?? '[]'; ?>;
     const serverActivities = <?php echo $jsActividades ?? '[]'; ?>;
-  </script>
+    const MAESTRO_ID = <?php echo (int)$maestro_id; ?>;
 
-  <script>
-    // Variables globales
-    let evaluations = [];
-    let assignments = [];
-    let courses = [];
+    function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-    function renderEvaluations() {
-      const container = document.getElementById('evaluations-container');
-      if (!container) return;
-      if (!evaluations.length) {
-        container.innerHTML = '<div class="empty" style="padding:12px">No hay evaluaciones.</div>';
+    function renderEvaluations(){
+      const el = document.getElementById('evaluations-list');
+      if(!el) return;
+      if(!serverEvaluations.length){
+        el.innerHTML = '<div class="card"><div class="small">No hay evaluaciones.</div></div>';
         return;
       }
-      container.innerHTML = '<ul style="list-style:none;padding:0;margin:0;">' + evaluations.map(ev => {
-        return `<li style="background:#fff;padding:12px;border-radius:8px;margin-bottom:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);">
-          <strong>${escapeHtml(ev.evaluationTitle || ev.Titulo)}</strong><br>
-          <small>Curso: ${escapeHtml(ev.NombreCurso || '')} — Fecha: ${escapeHtml(ev.dueDate || ev.FechaVencimiento || '')}</small>
-          <div style="margin-top:8px;">${escapeHtml(ev.description || '').slice(0,200)}</div>
-          <div style="margin-top:8px;font-size:0.9rem">
-            Puntos: ${ev.maxScore || ev.Puntos} — Intentos: ${ev.attempts || ev.Intentos}
-            <div style="margin-top:6px;">
-              <a class="btn" href="ver_evaluacion.php?id=${ev.id}&maestro_id=<?php echo $maestro_id; ?>">Ver</a>
-              <a class="btn" href="editar_evaluacion.php?id=${ev.id}&maestro_id=<?php echo $maestro_id; ?>">Editar</a>
-            </div>
-          </div>
-        </li>`;
-      }).join('') + '</ul>';
+      el.innerHTML = serverEvaluations.map(ev=>{
+        const curso = esc(ev.NombreCurso || '');
+        const titulo = esc(ev.Titulo || ev.evaluationTitle || 'Sin título');
+        const desc = esc((ev.Descripcion || ev.description || '').slice(0,220));
+        const due = esc(ev.FechaVencimiento || ev.dueDate || '');
+        const id = encodeURIComponent(ev.EvaluacionID ?? ev.id);
+        return `<div class="card">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                      <h3>${titulo}</h3>
+                      <div class="small">${curso} ${due ? '• Vence: '+due : ''}</div>
+                    </div>
+                    <div class="right-actions">
+                      <a class="chip" href="edit.php?id=${id}&maestro_id=${MAESTRO_ID}">Editar</a>
+                      <a class="chip" href="delete.php?id=${id}&maestro_id=${MAESTRO_ID}" onclick="return confirm('Eliminar evaluación? Esto es irreversible.')">Borrar</a>
+                    </div>
+                  </div>
+                  <div class="desc">${desc}</div>
+                  <div class="row">
+                    <div class="small">Puntos: ${esc(ev.Puntos ?? ev.maxScore ?? '')} • Preguntas: ${esc(ev.TotalPreguntas ?? ev.totalQuestions ?? '')}</div>
+                    <div class="small">${ev.RequiereArchivo ? 'Adjunto requerido' : ''}</div>
+                  </div>
+                </div>`;
+      }).join('');
     }
 
-    function renderAssignments() {
-      const container = document.getElementById('assignments-container');
-      if (!container) return;
-      if (!assignments.length) {
-        container.innerHTML = '<div class="empty" style="padding:12px">No hay asignaciones.</div>';
+    function renderAssignments(){
+      const el = document.getElementById('assignments-list');
+      if(!el) return;
+      if(!serverActivities.length){
+        el.innerHTML = '<div class="card"><div class="small">No hay asignaciones.</div></div>';
         return;
       }
-      container.innerHTML = '<ul style="list-style:none;padding:0;margin:0;">' + assignments.map(a => {
-        return `<li style="background:#fff;padding:12px;border-radius:8px;margin-bottom:8px;box-shadow:0 2px 6px rgba(0,0,0,0.05);">
-          <strong>${escapeHtml(a.Titulo || a.TituloRender || a.TituloCorto)}</strong><br>
-          <small>Curso: ${escapeHtml(a.NombreCurso || '')} — Vence: ${escapeHtml(a.FechaVencimiento || '')}</small>
-          <div style="margin-top:8px;">${escapeHtml(a.Descripcion || '').slice(0,200)}</div>
-          <div style="margin-top:8px;font-size:0.9rem">
-            Puntos: ${a.Puntos || 0} — Tipo: ${escapeHtml(a.Tipo || '')}
-            <div style="margin-top:6px;">
-              <a class="btn" href="ver_actividad.php?id=${a.ActividadID}&maestro_id=<?php echo $maestro_id; ?>">Ver</a>
-              <a class="btn" href="editar_actividad.php?id=${a.ActividadID}&maestro_id=<?php echo $maestro_id; ?>">Editar</a>
-            </div>
-          </div>
-        </li>`;
-      }).join('') + '</ul>';
+      el.innerHTML = serverActivities.slice(0,8).map(a=>{
+        const id = encodeURIComponent(a.ActividadID ?? a.id);
+        return `<div style="padding:8px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,0.04)">
+                  <strong>${esc(a.Titulo || '')}</strong>
+                  <div class="small">${esc(a.NombreCurso || '')} • Vence: ${esc(a.FechaVencimiento || '')}</div>
+                  <div style="margin-top:6px;display:flex;gap:6px;justify-content:flex-end">
+                    <a class="chip" href="edit.php?id=${id}&maestro_id=${MAESTRO_ID}">Editar</a>
+                    <a class="chip" href="delete.php?id=${id}&maestro_id=${MAESTRO_ID}" onclick="return confirm('Eliminar asignación?')">Borrar</a>
+                  </div>
+                </div>`;
+      }).join('');
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    function initializeApp() {
-      courses = serverCourses || [];
-      evaluations = serverEvaluations || [];
-      assignments = serverActivities || [];
-
-      renderEvaluations();
-      renderAssignments();
-    }
-
-    // Inicializar después de definir server variables
-    initializeApp();
+    renderEvaluations();
+    renderAssignments();
   </script>
 </body>
 </html>

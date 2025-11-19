@@ -119,6 +119,7 @@ while ($row = $activities_result->fetch_assoc()) {
         'Descripcion' => $row['Descripcion'],
         'Puntos' => $row['Puntos'],
         'dueDate' => $row['dueDate'],
+        'ArchivoRequerido' => (int)($row['ArchivoRequerido'] ?? 0),
         'status' => $status, // Estado final para JS
         'isOverdue' => ($status === 'overdue'),
         'grade' => $row['grade'],
@@ -1252,7 +1253,7 @@ $conn->close();
             </div>
             
             <form id="submissionForm" class="submission-form">
-                <div class="form-group">
+                <div class="form-group" id="fileUploadSection">
                     <label class="form-label">📎 Archivo de Entrega</label>
                     <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
                         <div class="upload-icon">📁</div>
@@ -1488,11 +1489,10 @@ $conn->close();
             
             document.getElementById('modalActivityTitle').textContent = `Entregar: ${currentActivity.Titulo}`;
             
-            // Mostrar u ocultar el input de archivo
-            if (currentActivity.ArchivoRequerido == 1) {
-                document.getElementById('fileUploadSection').style.display = 'block';
-            } else {
-                document.getElementById('fileUploadSection').style.display = 'none';
+            // Mostrar u ocultar el input de archivo (con protección si el elemento no existe)
+            const fileUploadEl = document.getElementById('fileUploadSection');
+            if (fileUploadEl) {
+                fileUploadEl.style.display = currentActivity.ArchivoRequerido == 1 ? 'block' : 'none';
             }
             
             document.getElementById('submissionModal').classList.add('active');
@@ -1862,6 +1862,36 @@ $conn->close();
             return date.toLocaleDateString('es-ES', options);
         }
 
+        function deliverLate(activityId) {
+            if (!confirm('Confirmar entrega tardía (se registrará como "En calificación").')) return;
+            const fd = new FormData();
+            fd.append('activity_id', activityId);
+            fd.append('student_id', studentId);
+            fd.append('comments', 'Entrega marcada como tardía desde interfaz');
+            fd.append('force_no_file', '1');
+
+            fetch('submit_activity.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        alert('Entrega registrada correctamente.');
+                        const idx = activities.findIndex(a => a.ActividadID === activityId);
+                        if (idx !== -1) {
+                            activities[idx].status = res.status || 'grading';
+                            activities[idx].submittedDate = new Date().toISOString().split('T')[0];
+                            activities[idx].EntregaTardia = res.is_late ? 1 : 0;
+                        }
+                        loadCourseHeader();
+                        loadActivities();
+                    } else {
+                        alert('Error: ' + (res.message || 'No se pudo registrar entrega'));
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error al comunicarse con el servidor.');
+                });
+        }
     </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <?php
-// filepath: [cursos_profesores.php](http://_vscodecontentref_/3)
+// filepath: c:\laragon\www\HootAndLearn\profesores\asignaciones\asignaciones_profesores.php
 session_start();
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
@@ -113,6 +113,12 @@ h1{color:#4c1d95}
 <div class="container">
     <h1>Asignaciones — diagnóstico</h1>
 
+    <!-- Botones de acción -->
+    <div style="margin-top:12px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn" href="create.php?maestro_id=<?php echo (int)$maestro_id; ?>">➕ Nueva Asignación</a>
+        <a class="btn" href="../cursos/cursos_profesores.php?maestro_id=<?php echo (int)$maestro_id; ?>">📚 Mis Cursos</a>
+    </div>
+
     <div class="info">
         <strong>Maestro ID:</strong> <?php echo (int)$maestro_id; ?> &nbsp; |
         <strong>Cursos encontrados:</strong> <?php echo count($cursos); ?> &nbsp; |
@@ -180,8 +186,9 @@ SELECT * FROM actividades WHERE CursoID IN (<?php echo implode(',', array_map('i
                     <td><?php echo $a['ArchivoRequerido'] ? 'Sí' : 'No'; ?></td>
                     <td><?php echo $a['Activo'] ? 'Sí' : 'No'; ?></td>
                     <td>
-                        <a class="btn" href="ver_actividad.php?id=<?php echo $a['ActividadID']; ?>&maestro_id=<?php echo $maestro_id; ?>">Ver</a>
-                        <a class="btn" href="editar_actividad.php?id=<?php echo $a['ActividadID']; ?>&maestro_id=<?php echo $maestro_id; ?>">Editar</a>
+                        
+                        <a class="btn" href="edit.php?id=<?php echo $a['ActividadID']; ?>&maestro_id=<?php echo $maestro_id; ?>">Editar</a>
+                        <a class="btn" href="delete.php?id=<?php echo $a['ActividadID']; ?>&maestro_id=<?php echo $maestro_id; ?>">Eliminar</a>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -189,6 +196,9 @@ SELECT * FROM actividades WHERE CursoID IN (<?php echo implode(',', array_map('i
         </table>
     <?php endif; ?>
 
+
+
+</html></body></div>
 </div>
 </body>
 </html>

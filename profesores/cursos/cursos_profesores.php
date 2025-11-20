@@ -370,10 +370,8 @@ $showDeleteSuccess = isset($_GET['deleted']) && $_GET['deleted'] == '1';
                     <tr>
                         <th>ID</th>
                         <th>Curso</th>
-                        <th>Descripción</th>
                         <th>Duración</th>
-                        <th>Lecciones</th>
-                        <th style="text-align: right;">Acciones</th>
+                        <th style="text-align: center;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -382,10 +380,11 @@ $showDeleteSuccess = isset($_GET['deleted']) && $_GET['deleted'] == '1';
     <td><?= (int)$curso['CursoID'] ?></td>
     <td><?= htmlspecialchars($curso['NombreCurso']) ?></td>
     <td><?= htmlspecialchars($curso['Duracion'] ?? '') ?></td>
-    <td>
+    <td class="actions-cell">
+        <a class="btn btn-secondary" href="inscritos_curso.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">VerAlumnos</a>
         <a class="btn" href="student-manage.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Gestionar</a>
         <a class="btn" href="edit.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Editar</a>
-        <a class="btn btn-danger" href="eliminar_curso.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Eliminar</a>
+        <a class="btn btn-delete" href="eliminar_curso.php?id=<?= (int)$curso['CursoID'] ?>&maestro_id=<?= (int)$maestro_id ?>">Eliminar</a>
     </td>
 </tr>
                     <?php endforeach; ?>

@@ -60,6 +60,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $nombreCurso = $descripcion = $duracion = $instructor = "";
                 $lecciones = 0;
                 $icono = "📚";
+                $precio = "";
+                $fechaCreacion = date('Y-m-d H:i:s');
             } else {
                 $error = "Error al crear el curso: " . $stmt->error;
             }
@@ -363,6 +365,20 @@ $conn->close();
                     value="<?= htmlspecialchars($lecciones ?? 0) ?>"
                 >
                 <div class="helper-text">Cantidad total de lecciones del curso</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="precio">Precio</label>
+                <input
+                    type="number"
+                    id="precio"
+                    name="precio"
+                    min="0"
+                    step="0.01"
+                    placeholder="Ej: 49.99"
+                    value="<?= htmlspecialchars($precio ?? '') ?>"
+                >
+                <div class="helper-text">Introduce el precio del curso (ej. 49.99)</div>
             </div>
             
             <div class="form-group">
